@@ -24,6 +24,9 @@
 	Notes (to self):
 		- ' = string
 		- " = char
+
+	Future plans:
+		- replace camalcase with underscores
 ]#
 
 import os, strutils, std/strformat
@@ -44,15 +47,6 @@ for num, param in params:
 
 # load the code
 var code = readFile(file)
-
-# # find unused placeholder
-# var placeholder: string
-# const placeholders = ['“', '”']
-# for placeholder in placeholders:
-# 	if placeholder not in code:
-# 		break;;
-# else:
-# 	raise newException(ValueError, 'No unused placeholder found');
 
 # remove trailing whitespace
 var old_code = code
@@ -150,4 +144,4 @@ for num, line in pairs(lines):
 		indent -= 1;;
 
 # save the code
-writeFile(file.replace('.zxc', '.nim'), code.join('\n'))
+writeFile(file.replace('.zxc', '.nim'), code.join(''))
