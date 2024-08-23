@@ -1,29 +1,29 @@
 #[
-	this is a "compiler" for my custom language which I am calling zxc for now
-	it's basically nim but with a few styles changes to match my preference
+    this is a "compiler" for my custom language which I am calling zxc for now
+    it's basically nim but with a few styles changes to match my preference
 
-	Changes:
-		- indents are with tabs instead of spaces (the objectively superior method) not that they matter anymore, see below
-		- single quotes and double quotes are swapped so ' for string and " for characters
-		- replaces the indentation system a bracket system to avoid the "formatting is my syntax" issue
+    Changes:
+        - indents are with tabs instead of spaces (the objectively superior method) not that they matter anymore, see below
+        - single quotes and double quotes are swapped so ' for string and " for characters
+        - replaces the indentation system a bracket system to avoid the "formatting is my syntax" issue
 
-	Bracket system: (i think theres an official name for this)
-		- basically just the normal
-		```if stuff {
-			do something
-		} else {
-			do other stuff
-		}``` 
-		system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
-		- proper indentation with tabs is still recommended
+    Bracket system: (i think theres an official name for this)
+        - basically just the normal
+        ```if stuff {
+            do something
+        } else {
+            do other stuff
+        }``` 
+        system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
+        - proper indentation with tabs is still recommended
 
-	To Do:
-		- make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
-		- make sure quote processing works under all situations
+    To Do:
+        - make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
+        - make sure quote processing works under all situations
 
-	Notes (to self):
-		- ' = string
-		- " = char
+    Notes (to self):
+        - ' = string
+        - " = char
 ]#
 
 import os, strutils, std/strformat
@@ -101,21 +101,34 @@ for num, line in pairs(lines):
         # if not in a string/char and encounter `"`
         if not in_str:
             if char == '"':
-				# if is "\""
-                if line[index..index+4] == "\"\\\"\"":
-                    # replace with '\''
-                    lines[num] = line[0..index-1] & "'\''" & line[index+5..^1]
-                # if is """
-                elif line[index..index+3] == "\"\"\"":
-                    echo line
-                    # replace """ with '''
-                    lines[num] = line[0..index-1] & "'\''" & line[index+3..^1]
-                # is not """
-                elif line[index..index+2] == "\"\"":
-                    raise newException(ValueError, fmt"empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}")
-				else:
-                    # replace " with '
-                    lines[num] = line[0..index-1] & "'" & line[index+1..^1]
+                while true:
+                    # if is "\""
+                    try:
+                        if line[index..index+4] == "\"\\\"\"":
+                            # replace with '\''
+                            lines[num] = line[0..index-1] & "'\''" & line[index+5..^1]
+                            break
+                    except IndexDefect:
+                        discard;
+                    # if is """
+                    try:
+                        if line[index..index+3] == "\"\"\"":
+                            echo line
+                            # replace """ with '''
+                            lines[num] = line[0..index-1] & "'\''" & line[index+3..^1]
+                            break
+                    except IndexDefect:
+                        discard;
+                    # if is ""
+                    try:
+                        if line[index..index+2] == "\"\"":
+                            raise newException(ValueError,
+                                    fmt"empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}")
+                    except IndexDefect:
+                        discard;
+                        # replace " with '
+                        lines[num] = line[0..index-1] & "'" & line[index+1..^1]
+                        break
 
         # dealing with strings
             if char == '\'':
