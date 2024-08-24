@@ -9,28 +9,29 @@
 
     Bracket system: (i think theres an official name for this)
         - basically just the normal
-        ```if stuff {
+        ```
+        if stuff {
             do something
         } else {
             do other stuff
-        }```
+        }
+        ```
         system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
         - proper indentation with tabs is still recommended
 
     To Do:
-        - make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
-        - handle unesseary escape characters, eg. '\'' -> "'"
-        - create a readme
-        - add support for ##[, ]##
+        - make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line
+        - add support for ##[, ]##, and #?
+        - make it (default, optionaly) compile straight to binary instead of to nim
 
     Notes (to self):
         - ' = string
         - " = char
 
     Future plans:
-        - auto replace camalcase with underscores
         - add recursion so that you can import/include .zxc files
         - create/fork (vscode) linter/formatter
+        - add fancy support for indents in multiline strings where the tabs dont end up getting "parsed"
 ]#
 
 import os, strutils, std/strformat, strslice
@@ -98,8 +99,8 @@ for num, lIne in pairs(lines):
         ## swap quotes
         # dealing with characters
         if in_char:
-            if char_group == "\'":
-                line[index] = "\\\'"
+            if char_group == "'":
+                line[index] = "\\'"
             in_char = false
             continue
         # if not in a string/char and encounter `"`
@@ -110,7 +111,7 @@ for num, lIne in pairs(lines):
                     try:
                         if char_group == "\"\\\"\"" or char_group == "\"\"\"":
                             # replace with '\''
-                            line[index] = "\'\\\'\'"
+                            line[index] = "'\\''"
                             break a
                     except IndexDefect:
                         discard
@@ -121,25 +122,29 @@ for num, lIne in pairs(lines):
                     except IndexDefect:
                         discard
                     # else, replace " with '
-                    line[index] = "\'"
+                    line[index] = "'"
                     in_char = true
         # dealing with strings
             # if not in string and encounter ', replace with " and enter string
-            if char_group == "\'":
+            if char_group == "'":
                 line[index] = "\""
                 in_str = true
         else:
-            # if " in a string, escape it
+            # if " in string, escape it
             if char_group == "\"":
                 line[index] = "\\\""
-            # if """ in a string, escape it (\"\"\")
+            # if """ in string, escape it (\"\"\")
             elif char_group == "\"\"\"":
                 line[index] = "\\\"\\\"\\\""
-            # if "\"" in a string, escape it (\"\\\"\")
+            # if "\"" in string, escape it (\"\\\"\")
             elif char_group == "\"\\\"\"":
                 line[index] = "\\\"\\\\\\\"\\\""
+            # if \' in string, remove unesseary escape
+            elif char_group == "\\'":
+                line[index] = "'"
+
             # if ' in a string and is not escaped, swap and escape it, and exit string
-            if char_group == "\'":
+            if char_group == "'":
                 line[index] = "\""
                 in_str = false
 
