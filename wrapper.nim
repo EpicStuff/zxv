@@ -38,6 +38,8 @@
 import os, strutils, std/strformat, strslice, std/sequtils
 include stuff
 
+const indentation = "    "
+
 # get command line parameters
 var params = commandLineParams()
 
@@ -58,6 +60,7 @@ var code = readFile(file)
 var old_code = code
 while true:
     code = code.replace(" \n", "\n")
+    code = code.replace("\t\n", "\n")
     if code == old_code:
         break
     old_code = code
@@ -85,11 +88,9 @@ for num, lIne in pairs(lines):
     # check if is end of multiline comment
     if line[^1] == "]#" and comment > 0:
         comment -= 1
-    # if is in a comment block, skip
-    if comment > 0:
-        continue
-    if line[0] == "#":
-        # lines[num] = ""
+    # if is in a comment block or is a normal line comment, skip
+    if comment > 0 or line[0] == "#":
+        lines[num] = lines[num].replace("\t", indentation)
         continue
 
     ## deal with multiline strings
