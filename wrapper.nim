@@ -27,19 +27,20 @@
 ]#
 
 import os, strutils, std/strformat, strslice, std/sequtils
+include stuff
 
 # get command line parameters
 var params = commandLineParams()
 
-# loop through command line parameters for first argument that doesn't start with `-`
-var file: string
-for num, param in params:
-    if param[0] != '-':
-        file = param
-        params.delete(num)
-        break
+# # loop through command line parameters for first argument that doesn't start with `-`
+# var file: string
+# for num, param in params:
+#     if param[0] != '-':
+#         file = param
+#         params.delete(num)
+#         break
 
-# var file = "test.zxc"
+var file = "test.zxc"
 
 # load the code
 var code = readFile(file)
@@ -60,7 +61,9 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-    var line = map(strip(lIne), proc(c: char): string = $c)
+    # var line = map(strip(lIne), proc(c: char): string = $c)
+    # split string into list of 1 long strings, unless escape character
+    var line = ssplit(lIne)
     # skip empty lines
     if line == @[]:
         continue
@@ -70,17 +73,17 @@ for num, lIne in pairs(lines):
     if line[0..1].join() == "#[":
         comment += 1
     # check if is end of multiline comment
-    if line[^2..^1].join() == "#]" and comment > 0:
+    if line[^2..^1].join() == "]#" and comment > 0:
         comment -= 1
-    if line[0] == "#":
-        continue
     # if is in a comment block
     if comment > 0:
+        continue
+    if line[0] == "#":
+        lines[num] = "  "
         continue
 
     ## deal with multiline strings
     # to do
-    echo fmt"{num}, {comment}"
     ## if not in a comment/string block
     # go character by character
     for index, char in pairs(line):
@@ -101,7 +104,7 @@ for num, lIne in pairs(lines):
                             line[index + 4] = ""
                             break
                     except IndexDefect:
-                        discard;
+                        discard
 
                     try:
                         if line[index..index+3] == ["\"", "\"", "\""]:
@@ -111,19 +114,18 @@ for num, lIne in pairs(lines):
                             line[index + 2] = ""
                             line[index + 3] = ""
                     except IndexDefect:
-                        discard;
+                        discard
                     # if is ""
                     try:
                         if line[index..index+2] == ["\"", "\""]:
                             raise newException(ValueError, fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
                     except IndexDefect:
-                        discard;
+                        discard
                     # replace " with '
                     line[index] = "'"
                     break
 
         # dealing with strings
-            
             if char == "'":
                 line[index] = "\""
                 in_str = true
@@ -142,10 +144,10 @@ for num, lIne in pairs(lines):
         indent += 1
     for index in countdown(line.len - 1, 0):
         if line[index] == ";":
-            line[^1] = ""
+            line[index] = ""
             indent -= 1;
         else:
-            break;
+            break
 
     lines[num] = line.join()
 

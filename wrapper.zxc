@@ -21,16 +21,21 @@
 		- make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
 		- make sure quote processing works under all situations
 		- handle unesseary escape characters, eg. '\'' -> "'"
+		- add support for functions
+		- create a readme
 
 	Notes (to self):
 		- ' = string
 		- " = char
 
 	Future plans:
-		- replace camalcase with underscores
+		- auto replace camalcase with underscores
+		- add recursion so that you can import/include .zxc files
+		- create/fork (vscode) linter/formatter
 ]#
 
 import os, strutils, std/strformat, strslice, std/sequtils
+include stuff
 
 # get command line parameters
 var params = commandLineParams()
@@ -63,6 +68,19 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
+	# split string into list of 1 long strings, unless escape character
+	var line: seq[string] = @[]
+	var skip = false
+	for index, char in pairs(lIne):
+		if skip == true:
+			skip = false
+			continue;
+		if char == "\\":
+			line.add($lIne[index + 1])
+			skip = true;
+		else:
+			line.add($char)
+
 	var line = map(strip(lIne), proc(c: char): string = $c)
 	# skip empty lines
 	if line == @[]:
@@ -72,13 +90,15 @@ for num, lIne in pairs(lines):
 	if line[0..1].join() == '#[':
 		comment += 1;
 	# check if is end of multiline comment
-	if line[^2..^1].join() == '#]' and comment > 0:
+	if line[^2..^1].join() == ']#' and comment > 0:
 		comment -= 1;
-	# skip comments (if line, ignoring indentation starts with #)
-	if line[0] == '#':
-		continue;
-	# if is in a comment block
+		assert comment >= 0, ':; bracket missmatch'
+	# if is in a comment block, skip
 	if comment > 0:
+		continue;
+	# if is single line comment (if line, ignoring indentation starts with #), replace with blank line
+	if line[0] == '#':
+		lines[num] = '  '
 		continue;
 
 	## deal with multiline strings
@@ -93,9 +113,9 @@ for num, lIne in pairs(lines):
 		if not in_str:
 			if char == '"':
 				while true:
-					# if is "\""
+					# if is " \" "
 					try:
-						if line[index..index+4].join() == '"\\""':
+						if line[index..index+4] == ['"', '\\"', '"']:
 							# replace with '\''
 							line[index] = '\'\\\'\''
 							line[index + 1] = ''
@@ -145,13 +165,13 @@ for num, lIne in pairs(lines):
 		indent += 1;
 	for index in countdown(line.len - 1, 0):
 		if line[index] == ';':
-			line[^1] = ''
+			line[index] = ''
 			indent -= 1;
 		else:
-			break;
+			break;;
 	
 	# save line, workaround to "weird" nim behaviour part 2
 	lines[num] = line.join();
 
 # save the code
-writeFile(file.replace('.zxc', '.nim'), code.join(''))
+writeFile(file.replace('.zxc', '.nim'), lines.join('\n'))
