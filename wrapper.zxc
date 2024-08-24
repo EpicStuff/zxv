@@ -20,6 +20,7 @@
 	To Do:
 		- make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
 		- make sure quote processing works under all situations
+		- handle unesseary escape characters, eg. '\'' -> "'"
 
 	Notes (to self):
 		- ' = string
@@ -29,7 +30,7 @@
 		- replace camalcase with underscores
 ]#
 
-import os, strutils, std/strformat
+import os, strutils, std/strformat, strslice
 
 # constants
 const indentation = '\t'
@@ -64,7 +65,8 @@ var comment = 0
 var in_str = false
 
 var lines = splitLines(code)
-for num, line in pairs(lines):
+for num, lIne in pairs(lines):
+	var line = lIne  # workaround to "weird" nim behaviour
 	# skip empty lines
 	if line == '':
 		continue
@@ -87,7 +89,7 @@ for num, line in pairs(lines):
 
 	## if not in a comment/string block
 	# get rid of indentation
-	lines[num] = strip(line)
+	line = strip(line)
 	# go character by character
 	for index, char in pairs(line):
 		## swap quotes
@@ -96,19 +98,11 @@ for num, line in pairs(lines):
 		if not in_str:
 			if char == '"':
 				while true:
-					# if is "\""
+					# if is "\"" or """
 					try:
-						if line[index..index+4] == '"\\""':
+						if line[index..index+4] == '"\\""' or line[index..index+3] == '"""':
 							# replace with '\''
-							lines[num] = line[0..index-1] & "'\''" & line[index+5..^1]
-							break;;
-					except IndexDefect:
-						discard;
-					# elif is """
-					try:
-						if line[index..index+3] == '"""':
-							# replace with '\''
-							lines[num] = line[0..index-1] & "'\''" & line[index+3..^1]
+							line[index..index+4] = '\'\\\'\''
 							break;;
 					except IndexDefect:
 						discard;
@@ -119,29 +113,32 @@ for num, line in pairs(lines):
 					except IndexDefect:
 						discard;
 					# else, replace " with '
-					lines[num] = line[0..index-1] & '\'' & line[index+1..^1]
+					line[index] = "'"
 					break;;;
 
 		# dealing with strings
 			# if not in string and encounter ', replace with " and enter string
 			if char == "'":
-				lines[num] = line[0..index-1] & "\"" & line[index+1..^1]
+				line[index] = "\""
 				in_str = true;;
 		else:
 			# if " in a string, escape it
 			if char == '"':
-				lines[num] = line[0..index-1] & '\\"' & line[index+1..^1]
+				line[index..index] = '\\"'
 			# if ' in a string and is not escaped, swap it and exit string
 			if char == "'" and line[index-1] != '\\':
-				lines[num] = line[0..index-1] & "\"" & line[index+1..^1]
+				line[index] = "\""
 				in_str = false;;
 
 	## deal with indentation
-	lines[num] = repeat('  ', indent) & line
+	line = repeat('  ', indent) & line
 	if line[^1] == ':':
 		indent += 1;
 	elif line[^1] == ';':
 		indent -= 1;;
+	
+	# save line, workaround to "weird" nim behaviour part 2
+	lines[num] = line
 
 # save the code
 writeFile(file.replace('.zxc', '.nim'), code.join(''))

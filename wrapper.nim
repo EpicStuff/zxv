@@ -26,7 +26,7 @@
         - " = char
 ]#
 
-import os, strutils, std/strformat, macros
+import os, strutils, std/strformat, strslice
 
 # constants
 const indentation = "\t"
@@ -77,7 +77,8 @@ var comment = 0
 var in_str = false
 
 var lines = splitLines(code)
-for num, line in pairs(lines):
+for num, lIne in pairs(lines):
+    var line = lIne
     # skip empty lines
     if line == "":
         continue
@@ -100,7 +101,7 @@ for num, line in pairs(lines):
 
     ## if not in a comment/string block
     # get rid of indentation
-    lines[num] = strip(line)
+    line = strip(line)
     # go character by character
     for index, char in pairs(line):
         ## swap quotes
@@ -109,63 +110,54 @@ for num, line in pairs(lines):
         if not in_str:
             if char == '"':
                 while true:
-                    test(112, lines[num])
+                    test(112, line)
                     # if is "\""
                     try:
-                        if lines[num][index..index+4] == "\"\\\"\"":
+                        if line[index..index+4] == "\"\\\"\"" or line[index..index+3] == "\"\"\"":
                             # replace with '\''
-                            lines[num] = lines[num][0..index-1] & "'\''" & lines[num][index+5..^1]
-                            break
-                    except IndexDefect:
-                        discard;
-                    # if is """
-                    try:
-                        if lines[num][index..index+3] == "\"\"\"":
-                            test(124, lines[num])
-                            # replace """ with '''
-                            lines[num] = lines[num][0..index-1] & "'\''" & lines[num][index+3..^1]
+                            line[index..index+4] = "'\\''"
                             break
                     except IndexDefect:
                         discard;
                     # if is ""
                     try:
-                        if lines[num][index..index+2] == "\"\"":
-                            raise newException(ValueError,
-                                    fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
+                        if line[index..index+2] == "\"\"":
+                            raise newException(ValueError, fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
                     except IndexDefect:
                         discard;
                         # replace " with '
-                        lines[num] = lines[num][0..index-1] & "'" & lines[num][index+1..^1]
+                        line[index] = '\''
                         break
 
         # dealing with strings
-            test(142, lines[num])
+            test(142, line)
             if char == '\'':
                 echo char
                 echo lines[num][0..index-2]
-                lines[num] = lines[num][0..index-2] & "\"" & lines[num][index..^1]
-                test(145, lines[num])
+                line[index] = '\"'
+                test(145, line)
                 in_str = true
         else:
-            test(148, lines[num])
+            test(148, line)
             # if " in a string, escape it
             if char == '"':
-                lines[num] = lines[num][0..index-1] & '\"' & lines[num][index+1..^1]
-            if char == '\'' and lines[num][index-1] != '\\':
-                try:
-                    lines[num] = lines[num][0..index-2] & '\"' & lines[num][index..^1]
-                except RangeDefect:
-                    lines[num] = lines[num][0..index-2] & '\"'
+                line[index..index] = "\\\""
+            if char == '\'' and line[index-1] != '\\':
+                line[index] = '\"'
                 in_str = false
-        test(155, lines[num])
+        test(155, line)
 
     ## deal with indentation
-    test(158, lines[num])
-    lines[num] = repeat("  ", indent) & lines[num]
-    if lines[num][^1] == ':':
+    test(158, line)
+    echo indent
+    line = repeat("  ", indent) & line
+    echo line
+    if line[^1] == ':':
         indent += 1
-    elif lines[num][^1] == ';':
+    elif line[^1] == ';':
         indent -= 1
+
+    lines[num] = line
 
 # save the code
 echo lines.join("\n")
