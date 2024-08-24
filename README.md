@@ -1,5 +1,5 @@
 # ZXC
-zxc, (prodounced zim) is [Nim](https://github.com/nim-lang/Nim) but with a few syntax changes to match my prefrences. (The name is temporary)
+zxc, (prodounced tim) is [Nim](https://github.com/nim-lang/Nim) but with a few syntax changes to match my prefrences. (the name is temporary)
 
 ## Introduction
 I only recently stumbled across Nim and was like lets give this a try, only to find "Tabs are forbidden in Nim to enforce a consistent coding style and eliminate potential issues related to mixed indentation." which is almost as much bullshit as yaml's "Tabs have been outlawed since they are treated differently by different editors and tools. And since indentation is so critical to proper interpretation of YAML, this issue is just too tricky to even attempt." Afterall, Tabs are objectivly the superior indentation method. So I made this to make Nim work with tabs, and while I was at it, I went a bit overboard and made a few other changes.
@@ -27,15 +27,23 @@ if stuff:
 else:
 	do other stuff;
 ``` 
-- proper indentation with tabs is still recommended
+- proper indentation with tabs is still recommended but not required
+
+## Usage
+1. `nim c wrapper.nim`
+2. `./wrapper [your code].zxc`, this will output `[your code].nim` which you can than compile with `nim c [your code].nim`
 
 ## To Do:
 - make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line (i think thats a thing in Nim)
-- add support for ##[, ]##, and #?
+- add support for `##[`, `]##`, and `#?`
 - make it (default, optionaly) compile straight to binary instead of to nim
 
 ## Future plans:
 - add recursion so that you can import/include .zxc files
 - create/fork (vscode) linter/formatter
 	- make it suggest the snake case version instead of camelcase
-- add fancy support for indents in multiline strings where the tabs dont end up getting "parsed" (if nim doesnt do this allready)
+- add fancy support for indents in multiline strings where the tabs dont end up getting "parsed" (if nim doesn't do this allready)
+
+## Stuff
+- i'd love any contributions (as long as matches my views on what the "correct" programming formmating is)
+- [Anti Commercial-AI license Thingy](https://creativecommons.org/licenses/by-nc-sa/4.0/)
