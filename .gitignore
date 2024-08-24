@@ -1,0 +1,8 @@
+wrapper
+test
+test.*
+
+wrapper copy.nim
+.vscode/
+.theia/
+.trunk/

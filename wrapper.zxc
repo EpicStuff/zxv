@@ -30,10 +30,7 @@
 		- replace camalcase with underscores
 ]#
 
-import os, strutils, std/strformat, strslice
-
-# constants
-const indentation = '\t'
+import os, strutils, std/strformat, strslice, std/sequtils
 
 # get command line parameters
 var params = commandLineParams()
@@ -66,16 +63,16 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-	var line = lIne  # workaround to "weird" nim behaviour
+	var line = strip(lIne).toSeq()
 	# skip empty lines
-	if line == '':
+	if line == @[]:
 		continue
 	## deal with comments
 	# skip comments (if line, ignoring indentation starts with #)
-	if line.replace(indentation, '')[0] == "#":
+	if line[0] == "#":
 		continue;
 	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
-	if line.replace(indentation, '')[0..1] == '#[':
+	if line[0..1] == '#[':
 		comment += 1;
 	# check if is end of multiline comment
 	if line[^2..^1] == '#]' and comment > 0:
@@ -88,8 +85,6 @@ for num, lIne in pairs(lines):
 	# to do
 
 	## if not in a comment/string block
-	# get rid of indentation
-	line = strip(line)
 	# go character by character
 	for index, char in pairs(line):
 		## swap quotes
@@ -138,7 +133,7 @@ for num, lIne in pairs(lines):
 		indent -= 1;;
 	
 	# save line, workaround to "weird" nim behaviour part 2
-	lines[num] = line
+	lines[num] = line.join()
 
 # save the code
 writeFile(file.replace('.zxc', '.nim'), code.join(''))
