@@ -23,6 +23,7 @@
 		- handle unesseary escape characters, eg. '\'' -> "'"
 		- add support for functions
 		- create a readme
+		- add support for ##[, ]##
 
 	Notes (to self):
 		- ' = string
@@ -69,6 +70,7 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
+	debugEcho 'checking line: ', num
 	# split string into list of 1 long strings, unless escape character
 	var line = ssplit(strip(lIne))
 	# skip empty lines
@@ -95,6 +97,7 @@ for num, lIne in pairs(lines):
 	## if not in a comment/string block
 	# go character by character
 	for index, char_group in pairs(line):
+		debugEcho '\tchecking ', index, 'th char group: ', char_group
 		## swap quotes
 		# dealing with characters
 		if in_char:
@@ -132,7 +135,13 @@ for num, lIne in pairs(lines):
 			# if " in a string, escape it
 			if char_group == '"':
 				line[index] = '\\"';
-			# if ' in a string and is not escaped, swap it and exit string
+			# if """ in a string, escape it (\"\"\")
+			elif char_group == "\"\"\"":
+				line[index] = "\\\"\\\"\\\"";
+			# if "\"" in a string, escape it (\"\\\"\")
+			elif char_group == "\"\\\"\"":
+				line[index] = "\\\"\\\\\\\"\\\"";
+			# if ' in a string and is not escaped, swap and escape it, and exit string
 			if char_group == '\'':
 				line[index] = '"'
 				in_str = false;;;

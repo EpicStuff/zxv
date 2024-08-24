@@ -3,6 +3,7 @@ test
 test.*
 stuff
 tmp.nim
+tmp
 
 wrapper copy.nim
 .vscode/

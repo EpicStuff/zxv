@@ -23,6 +23,7 @@
         - handle unesseary escape characters, eg. '\'' -> "'"
         - add support for functions
         - create a readme
+		- add support for ##[, ]##
 
     Notes (to self):
         - ' = string
@@ -70,18 +71,19 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
+    debugEcho "checking line: ", num
     # split string into list of 1 long strings, unless escape character
     var line = ssplit(strip(lIne))
     # skip empty lines
     if line == @[]:
         continue
     ## deal with comments
-    debugEcho "line starts with: ", line[0], "comment: ", comment
+    # debugEcho "line starts with: ", line[0], "comment: ", comment
     # check if is start of multiline comment (if line, ignoring indentation starts with #[)
     if line[0] == "#[":
         comment += 1
     # check if is end of multiline comment
-    if line[^1]  == "]#" and comment > 0:
+    if line[^1] == "]#" and comment > 0:
         comment -= 1
     # if is in a comment block, skip
     if comment > 0:
@@ -96,13 +98,14 @@ for num, lIne in pairs(lines):
     ## if not in a comment/string block
     # go character by character
     for index, char_group in pairs(line):
+        debugEcho "\tchecking ", index, "th char group: ", char_group
         ## swap quotes
         # dealing with characters
         if in_char:
             if char_group == "'":
-                line[index] = "\\'";
+                line[index] = "\\'"
             in_char = false
-            continue;
+            continue
         # if not in a string/char and encounter `"`
         if not in_str:
             if char_group == "\"":
@@ -130,10 +133,27 @@ for num, lIne in pairs(lines):
                 line[index] = "\""
                 in_str = true
         else:
+            # # split up char groups
+            # var char_group = ssplit(char_group, specials = @["\\\""])
+            # for i, chars in char_group:
+            #     # if " in a string, escape it
+            #     if chars == "\"":
+            #         char_group[i] = "\\\""
+            #     # if ' in a string and is not escaped, swap and escape it, and exit string
+            #     if chars == "'":
+            #         line[index] = "\""
+            #         in_str = false
+            
             # if " in a string, escape it
             if char_group == "\"":
                 line[index] = "\\\""
-            # if ' in a string and is not escaped, swap it and exit string
+            # if """ in a string, escape it (\"\"\")
+            elif char_group == "\"\"\"":
+                line[index] = "\\\"\\\"\\\""
+            # if "\"" in a string, escape it (\"\\\"\")
+            elif char_group == "\"\\\"\"":
+                line[index] = "\\\"\\\\\\\"\\\""
+            # if ' in a string and is not escaped, swap and escape it, and exit string
             if char_group == "'":
                 line[index] = "\""
                 in_str = false
@@ -146,7 +166,7 @@ for num, lIne in pairs(lines):
     for index in countdown(line.len - 1, 0):
         if line[index] == ";":
             line[index] = ""
-            indent -= 1;
+            indent -= 1
         else:
             break
 
