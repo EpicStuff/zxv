@@ -13,17 +13,15 @@
             do something
         } else {
             do other stuff
-        }``` 
+        }```
         system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
         - proper indentation with tabs is still recommended
 
     To Do:
         - make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
-        - make sure quote processing works under all situations
         - handle unesseary escape characters, eg. '\'' -> "'"
-        - add support for functions
         - create a readme
-		- add support for ##[, ]##
+        - add support for ##[, ]##
 
     Notes (to self):
         - ' = string
@@ -35,7 +33,7 @@
         - create/fork (vscode) linter/formatter
 ]#
 
-import os, strutils, std/strformat, strslice, std/sequtils
+import os, strutils, std/strformat, strslice
 include stuff
 
 const indentation = "    "
@@ -43,15 +41,13 @@ const indentation = "    "
 # get command line parameters
 var params = commandLineParams()
 
-# # loop through command line parameters for first argument that doesn't start with `-`
-# var file: string
-# for num, param in params:
-#     if param[0] != '-':
-#         file = param
-#         params.delete(num)
-#         break
-
-var file = "test.zxc"
+# loop through command line parameters for first argument that doesn't start with `-`
+var file: string
+for num, param in params:
+    if param[0] != '-':
+        file = param
+        params.delete(num)
+        break
 
 # load the code
 var code = readFile(file)
@@ -64,7 +60,6 @@ while true:
     if code == old_code:
         break
     old_code = code
-
 
 # deal with indentation
 var indent = 0
@@ -81,7 +76,7 @@ for num, lIne in pairs(lines):
     if line == @[]:
         continue
     ## deal with comments
-    # debugEcho "line starts with: ", line[0], "comment: ", comment
+    #debugEcho 'line starts with: ', line[0], 'comment: ', comment
     # check if is start of multiline comment (if line, ignoring indentation starts with #[)
     if line[0] == "#[":
         comment += 1
@@ -99,12 +94,12 @@ for num, lIne in pairs(lines):
     ## if not in a comment/string block
     # go character by character
     for index, char_group in pairs(line):
-        debugEcho "\tchecking ", index, "th char group: ", char_group
+        debugEcho "\tchecking ", index, "th char group: ", char_group, "\t\t\t", "indent: ", indent, ",\tcomment: ", comment, ",\tin char: ", in_char, ",\tin str: ", in_str
         ## swap quotes
         # dealing with characters
         if in_char:
-            if char_group == "'":
-                line[index] = "\\'"
+            if char_group == "\'":
+                line[index] = "\\\'"
             in_char = false
             continue
         # if not in a string/char and encounter `"`
@@ -115,36 +110,25 @@ for num, lIne in pairs(lines):
                     try:
                         if char_group == "\"\\\"\"" or char_group == "\"\"\"":
                             # replace with '\''
-                            line[index] = "'\\''"
+                            line[index] = "\'\\\'\'"
                             break a
                     except IndexDefect:
                         discard
                     # elif is ""
                     try:
                         if char_group == "\"\"":
-                            raise newException(ValueError, fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
+                            raise newException(ValueError, fmt"empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}")
                     except IndexDefect:
                         discard
-                    # replace " with '
-                    line[index] = "'"
+                    # else, replace " with '
+                    line[index] = "\'"
                     in_char = true
         # dealing with strings
             # if not in string and encounter ', replace with " and enter string
-            if char_group == "'":
+            if char_group == "\'":
                 line[index] = "\""
                 in_str = true
         else:
-            # # split up char groups
-            # var char_group = ssplit(char_group, specials = @["\\\""])
-            # for i, chars in char_group:
-            #     # if " in a string, escape it
-            #     if chars == "\"":
-            #         char_group[i] = "\\\""
-            #     # if ' in a string and is not escaped, swap and escape it, and exit string
-            #     if chars == "'":
-            #         line[index] = "\""
-            #         in_str = false
-            
             # if " in a string, escape it
             if char_group == "\"":
                 line[index] = "\\\""
@@ -155,14 +139,13 @@ for num, lIne in pairs(lines):
             elif char_group == "\"\\\"\"":
                 line[index] = "\\\"\\\\\\\"\\\""
             # if ' in a string and is not escaped, swap and escape it, and exit string
-            if char_group == "'":
+            if char_group == "\'":
                 line[index] = "\""
                 in_str = false
-        
 
     ## deal with indentation
-    line[0] = repeat("    ", indent) & line[0]
-    if line[^1] == ":":
+    line[0] = repeat(indentation, indent) & line[0]
+    if line[^1] == ":" or line[^1] == "=":
         indent += 1
     for index in countdown(line.len - 1, 0):
         if line[index] == ";":
@@ -170,7 +153,6 @@ for num, lIne in pairs(lines):
             indent -= 1
         else:
             break
-
     lines[num] = line.join()
 
 # save the code

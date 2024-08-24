@@ -14,7 +14,7 @@ proc ssplit(str: string, specials = ['\\*', '"""', '\'\'\'', '#[', ']#', '\\\'']
 				# compare each char to each special
 			for special in specials:
 				block b:
-					debugEcho '\tchecking: \'', special, "'"
+					debugEcho '\tchecking: \'', special, '\''
 					try:
 						# take the first char in special
 						for num, spe in special:

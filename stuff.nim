@@ -1,12 +1,5 @@
-proc myecho(x: varargs[string, `$`]) = 
-  for arg in x:
-    stdout.write arg
-    stdout.write ' '
-  stdout.flushFile()
-
-
-proc ssplit(str: string, specials = ["\\*", "\"\"\"", "\'\'\'", "#[", "]#", "\\'"]): seq[string] =
-    ## split a string into a list of individual letters as strings 
+proc ssplit(str: string, specials = ["\\*", "\"\"\"", "\'\'\'", "#[", "]#", "\\\'"]): seq[string] =
+    ## split a string into a list of individual letters as strings
     ## and string segment found in special will be concidered as a single "letter"
     ## default specials are ''', """, "\"", #[, ]#, \'
     var line: seq[string]
@@ -14,18 +7,18 @@ proc ssplit(str: string, specials = ["\\*", "\"\"\"", "\'\'\'", "#[", "]#", "\\'
     # for each char in string
     for index, char in pairs(str):
         block a:
-            #debugEcho index, "st char, ", char, ", skip: ", skip
+            debugEcho index, "st char, ", char, ", skip: ", skip
             if skip > 0:
                 skip -= 1
-                continue;
-            # compare each char to each special
+                continue
+                # compare each char to each special
             for special in specials:
                 block b:
-                    #debugEcho "\tchecking: '", special, "'"
+                    debugEcho "\tchecking: \'", special, "\'"
                     try:
                         # take the first char in special
                         for num, spe in special:
-                            #debugEcho "\t\tmatching: ", spe
+                            debugEcho "\t\tmatching: ", spe
                             # if special is a star, auto match
                             if spe == '*':
                                 continue
@@ -33,18 +26,13 @@ proc ssplit(str: string, specials = ["\\*", "\"\"\"", "\'\'\'", "#[", "]#", "\\'
                             if spe != str[index + num]:
                                 break b
                         # if match
-                        #debugEcho "\tmatch"
+                        debugEcho "\tmatch"
                         var len = special.len - 1
                         line.add(str[index..index+len])
                         skip += len
                         break a
                     except IndexDefect:
                         discard
-            #debugEcho "\tno match"
+            debugEcho "\tno match"
             line.add($char)
-    # myecho line
     return line
-
-# var tmp = ssplit(readFile("test.zxc"))
-# debugEcho tmp
-# debugEcho "file: ", readFile("test.zxc")

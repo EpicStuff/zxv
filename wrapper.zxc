@@ -19,9 +19,7 @@
 
 	To Do:
 		- make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
-		- make sure quote processing works under all situations
 		- handle unesseary escape characters, eg. '\'' -> "'"
-		- add support for functions
 		- create a readme
 		- add support for ##[, ]##
 
@@ -35,7 +33,7 @@
 		- create/fork (vscode) linter/formatter
 ]#
 
-import os, strutils, std/strformat, strslice, std/sequtils
+import os, strutils, std/strformat, strslice
 include stuff
 
 const indentation = '    '
@@ -63,8 +61,6 @@ while true:
 		break;
 	old_code = code;
 
-
-
 # deal with indentation
 var indent = 0
 var comment = 0
@@ -80,6 +76,7 @@ for num, lIne in pairs(lines):
 	if line == @[]:
 		continue;
 	## deal with comments
+	#debugEcho 'line starts with: ', line[0], 'comment: ', comment
 	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
 	if line[0] == '#[':
 		comment += 1;
@@ -97,7 +94,7 @@ for num, lIne in pairs(lines):
 	## if not in a comment/string block
 	# go character by character
 	for index, char_group in pairs(line):
-		debugEcho '\tchecking ', index, 'th char group: ', char_group
+		debugEcho '\tchecking ', index, 'th char group: ', char_group, '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
 		## swap quotes
 		# dealing with characters
 		if in_char:
@@ -124,8 +121,8 @@ for num, lIne in pairs(lines):
 					except IndexDefect:
 						discard;
 					# else, replace " with '
-					line[index] = '\'';;
-					in_char = true
+					line[index] = '\''
+					in_char = true;;
 		# dealing with strings
 			# if not in string and encounter ', replace with " and enter string
 			if char_group == '\'':
@@ -147,8 +144,8 @@ for num, lIne in pairs(lines):
 				in_str = false;;;
 
 	## deal with indentation
-	line[0] = repeat('  ', indent) & line[0]
-	if line[^1] == ':':
+	line[0] = repeat(indentation, indent) & line[0]
+	if line[^1] == ':' or line[^1] == '=':
 		indent += 1;
 	for index in countdown(line.len - 1, 0):
 		if line[index] == ';':
@@ -156,8 +153,6 @@ for num, lIne in pairs(lines):
 			indent -= 1;
 		else:
 			break;;
-	
-	# save line, workaround to "weird" nim behaviour part 2
 	lines[num] = line.join();
 
 # save the code
