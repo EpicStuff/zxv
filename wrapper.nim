@@ -28,9 +28,6 @@
 
 import os, strutils, std/strformat, strslice, std/sequtils
 
-# constants
-const indentation = "\t"
-
 # get command line parameters
 var params = commandLineParams()
 
@@ -63,27 +60,27 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-    var line = strip(lIne).toSeq()
+    var line = map(strip(lIne), proc(c: char): string = $c)
     # skip empty lines
     if line == @[]:
         continue
     ## deal with comments
     # skip comments (if line, ignoring indentation starts with #)
-    if line[0] == '#':
-        continue
     # check if is start of multiline comment (if line, ignoring indentation starts with #[)
-    if line[0..1] == "#[":
+    if line[0..1].join() == "#[":
         comment += 1
     # check if is end of multiline comment
-    if line[^2..^1] == "#]" and comment > 0:
+    if line[^2..^1].join() == "#]" and comment > 0:
         comment -= 1
+    if line[0] == "#":
+        continue
     # if is in a comment block
     if comment > 0:
         continue
 
     ## deal with multiline strings
     # to do
-
+    echo fmt"{num}, {comment}"
     ## if not in a comment/string block
     # go character by character
     for index, char in pairs(line):
@@ -91,56 +88,66 @@ for num, lIne in pairs(lines):
         # dealing with characters
         # if not in a string/char and encounter `"`
         if not in_str:
-            if char == '"':
+            if char == "\"":
                 while true:
                     # if is "\""
                     try:
-                        if line[index..index+4] == "\"\\\"\"" or line[index..index+3] == "\"\"\"":
+                        if line[index..index+4] == ["\"", "\\", "\"", "\""]:
                             # replace with '\''
-                            line[index..index+4] = "'\\''"
+                            line[index] = "'\\''"
+                            line[index + 1] = ""
+                            line[index + 2] = ""
+                            line[index + 3] = ""
+                            line[index + 4] = ""
                             break
+                    except IndexDefect:
+                        discard;
+
+                    try:
+                        if line[index..index+3] == ["\"", "\"", "\""]:
+                            # replace with '\''
+                            line[index] = "'\\''"
+                            line[index + 1] = ""
+                            line[index + 2] = ""
+                            line[index + 3] = ""
                     except IndexDefect:
                         discard;
                     # if is ""
                     try:
-                        if line[index..index+2] == "\"\"":
+                        if line[index..index+2] == ["\"", "\""]:
                             raise newException(ValueError, fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
                     except IndexDefect:
                         discard;
                     # replace " with '
-                    line[index] = '\''
+                    line[index] = "'"
                     break
 
         # dealing with strings
             
-            if char == '\'':
-                
-                
-                line[index] = '\"'
-                
+            if char == "'":
+                line[index] = "\""
                 in_str = true
         else:
-            
             # if " in a string, escape it
-            if char == '"':
-                line[index..index] = "\\\""
-            if char == '\'' and line[index-1] != '\\':
-                line[index] = '\"'
+            if char == "\"":
+                line[index] = "\\\""
+            if char == "'" and line[index-1] != "\\":
+                line[index] = "\""
                 in_str = false
         
 
     ## deal with indentation
-    
-    
-    line[0..0] = repeat("  ", indent) & line[0]
-    
-    if line[^1] == ':':
+    line[0] = repeat("    ", indent) & line[0]
+    if line[^1] == ":":
         indent += 1
-    elif line[^1] == ';':
-        indent -= 1
+    for index in countdown(line.len - 1, 0):
+        if line[index] == ";":
+            line[^1] = ""
+            indent -= 1;
+        else:
+            break;
 
     lines[num] = line.join()
 
 # save the code
-
 writeFile(file.replace(".zxc", ".nim"), lines.join("\n"))

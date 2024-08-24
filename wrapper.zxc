@@ -41,7 +41,7 @@ for num, param in params:
 	if param[0] != "-":
 		file = param
 		params.delete(num)
-		break
+		break;;
 
 # load the code
 var code = readFile(file)
@@ -63,20 +63,20 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-	var line = strip(lIne).toSeq()
+	var line = map(strip(lIne), proc(c: char): string = $c)
 	# skip empty lines
 	if line == @[]:
-		continue
-	## deal with comments
-	# skip comments (if line, ignoring indentation starts with #)
-	if line[0] == "#":
 		continue;
+	## deal with comments
 	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
-	if line[0..1] == '#[':
+	if line[0..1].join() == '#[':
 		comment += 1;
 	# check if is end of multiline comment
-	if line[^2..^1] == '#]' and comment > 0:
+	if line[^2..^1].join() == '#]' and comment > 0:
 		comment -= 1;
+	# skip comments (if line, ignoring indentation starts with #)
+	if line[0] == '#':
+		continue;
 	# if is in a comment block
 	if comment > 0:
 		continue;
@@ -93,47 +93,65 @@ for num, lIne in pairs(lines):
 		if not in_str:
 			if char == '"':
 				while true:
-					# if is "\"" or """
+					# if is "\""
 					try:
-						if line[index..index+4] == '"\\""' or line[index..index+3] == '"""':
+						if line[index..index+4].join() == '"\\""':
 							# replace with '\''
-							line[index..index+4] = '\'\\\'\''
+							line[index] = '\'\\\'\''
+							line[index + 1] = ''
+							line[index + 2] = ''
+							line[index + 3] = ''
+							line[index + 4] = ''
 							break;;
+					except IndexDefect:
+						discard;
+					# if is """
+					try:
+						if [index..index+3].join() == '"""':
+							# replace with '\''
+							line[index] = '\'\\\'\''
+							line[index + 1] = ''
+							line[index + 2] = ''
+							line[index + 3] = '';;
 					except IndexDefect:
 						discard;
 					# elif is ""
 					try:
-						if line[index..index+2] == '""':
+						if line[index..index+2].join() == '""':
 							raise newException(ValueError, fmt'empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}');;
 					except IndexDefect:
 						discard;
 					# else, replace " with '
-					line[index] = "'"
-					break;;;
+					line[index] = '\''
+					break;;
 
 		# dealing with strings
 			# if not in string and encounter ', replace with " and enter string
-			if char == "'":
-				line[index] = "\""
+			if char == '\'':
+				line[index] = '"'
 				in_str = true;;
 		else:
 			# if " in a string, escape it
 			if char == '"':
-				line[index..index] = '\\"'
+				line[index] = '\\"';
 			# if ' in a string and is not escaped, swap it and exit string
-			if char == "'" and line[index-1] != '\\':
-				line[index] = "\""
-				in_str = false;;
+			if char == '\'' and line[index-1] != '\\':
+				line[index] = '\"'
+				in_str = false;;;
 
 	## deal with indentation
-	line = repeat('  ', indent) & line
+	line[0] = repeat('  ', indent) & line[0]
 	if line[^1] == ':':
 		indent += 1;
-	elif line[^1] == ';':
-		indent -= 1;;
+	for index in countdown(line.len - 1, 0):
+		if line[index] == ';':
+			line[^1] = ''
+			indent -= 1;
+		else:
+			break;
 	
 	# save line, workaround to "weird" nim behaviour part 2
-	lines[num] = line.join()
+	lines[num] = line.join();
 
 # save the code
 writeFile(file.replace('.zxc', '.nim'), code.join(''))
