@@ -1,6 +1,7 @@
 wrapper
 test
 test.*
+stuff
 
 wrapper copy.nim
 .vscode/

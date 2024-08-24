@@ -69,36 +69,23 @@ var in_str = false
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
 	# split string into list of 1 long strings, unless escape character
-	var line: seq[string] = @[]
-	var skip = false
-	for index, char in pairs(lIne):
-		if skip == true:
-			skip = false
-			continue;
-		if char == "\\":
-			line.add($lIne[index + 1])
-			skip = true;
-		else:
-			line.add($char)
-
-	var line = map(strip(lIne), proc(c: char): string = $c)
+	var line = ssplit(lIne)
 	# skip empty lines
 	if line == @[]:
 		continue;
 	## deal with comments
 	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
-	if line[0..1].join() == '#[':
+	if line[0] == '#[':
 		comment += 1;
 	# check if is end of multiline comment
-	if line[^2..^1].join() == ']#' and comment > 0:
+	if line[^1] == ']#' and comment > 0:
 		comment -= 1;
-		assert comment >= 0, ':; bracket missmatch'
 	# if is in a comment block, skip
 	if comment > 0:
 		continue;
 	# if is single line comment (if line, ignoring indentation starts with #), replace with blank line
 	if line[0] == '#':
-		lines[num] = '  '
+		#lines[num] = '  '
 		continue;
 
 	## deal with multiline strings
@@ -106,57 +93,41 @@ for num, lIne in pairs(lines):
 
 	## if not in a comment/string block
 	# go character by character
-	for index, char in pairs(line):
+	for index, char_group in pairs(line):
 		## swap quotes
 		# dealing with characters
 		# if not in a string/char and encounter `"`
 		if not in_str:
-			if char == '"':
-				while true:
-					# if is " \" "
+			if char_group == '"':
+				block a:
+					# if is "\"" or """
 					try:
-						if line[index..index+4] == ['"', '\\"', '"']:
+						if char_group == '"\\""' or char_group == '"""':
 							# replace with '\''
 							line[index] = '\'\\\'\''
-							line[index + 1] = ''
-							line[index + 2] = ''
-							line[index + 3] = ''
-							line[index + 4] = ''
-							break;;
-					except IndexDefect:
-						discard;
-					# if is """
-					try:
-						if [index..index+3].join() == '"""':
-							# replace with '\''
-							line[index] = '\'\\\'\''
-							line[index + 1] = ''
-							line[index + 2] = ''
-							line[index + 3] = '';;
+							break a;;
 					except IndexDefect:
 						discard;
 					# elif is ""
 					try:
-						if line[index..index+2].join() == '""':
+						if char_group == '""':
 							raise newException(ValueError, fmt'empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}');;
 					except IndexDefect:
 						discard;
 					# else, replace " with '
-					line[index] = '\''
-					break;;
-
+					line[index] = '\'';;
 		# dealing with strings
 			# if not in string and encounter ', replace with " and enter string
-			if char == '\'':
+			if char_group == '\'':
 				line[index] = '"'
 				in_str = true;;
 		else:
 			# if " in a string, escape it
-			if char == '"':
+			if char_group == '"':
 				line[index] = '\\"';
 			# if ' in a string and is not escaped, swap it and exit string
-			if char == '\'' and line[index-1] != '\\':
-				line[index] = '\"'
+			if char_group == '\'':
+				line[index] = '"'
 				in_str = false;;;
 
 	## deal with indentation

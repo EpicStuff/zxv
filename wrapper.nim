@@ -20,10 +20,18 @@
     To Do:
         - make it so that `.` gets replaced by `;` so you can do multiple statements on the same line
         - make sure quote processing works under all situations
+        - handle unesseary escape characters, eg. '\'' -> "'"
+        - add support for functions
+        - create a readme
 
     Notes (to self):
         - ' = string
         - " = char
+
+    Future plans:
+        - auto replace camalcase with underscores
+        - add recursion so that you can import/include .zxc files
+        - create/fork (vscode) linter/formatter
 ]#
 
 import os, strutils, std/strformat, strslice, std/sequtils
@@ -61,71 +69,56 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-    # var line = map(strip(lIne), proc(c: char): string = $c)
     # split string into list of 1 long strings, unless escape character
     var line = ssplit(lIne)
     # skip empty lines
     if line == @[]:
         continue
     ## deal with comments
-    # skip comments (if line, ignoring indentation starts with #)
     # check if is start of multiline comment (if line, ignoring indentation starts with #[)
     if line[0..1].join() == "#[":
         comment += 1
     # check if is end of multiline comment
     if line[^2..^1].join() == "]#" and comment > 0:
         comment -= 1
-    # if is in a comment block
+    # if is in a comment block, skip
     if comment > 0:
         continue
     if line[0] == "#":
-        lines[num] = "  "
+        #lines[num] = "  "
         continue
 
     ## deal with multiline strings
     # to do
+
     ## if not in a comment/string block
     # go character by character
-    for index, char in pairs(line):
+    for index, char_group in pairs(line):
         ## swap quotes
         # dealing with characters
         # if not in a string/char and encounter `"`
         if not in_str:
-            if char == "\"":
-                while true:
-                    # if is "\""
+            if char_group == "\"":
+                block a:
+                    # if is "\"" or """
                     try:
-                        if line[index..index+4] == ["\"", "\\", "\"", "\""]:
+                        if char_group =="\"\\\"\"" or char_group == "\"\"\"":
                             # replace with '\''
                             line[index] = "'\\''"
-                            line[index + 1] = ""
-                            line[index + 2] = ""
-                            line[index + 3] = ""
-                            line[index + 4] = ""
-                            break
+                            break a
                     except IndexDefect:
                         discard
-
+                    # elif is ""
                     try:
-                        if line[index..index+3] == ["\"", "\"", "\""]:
-                            # replace with '\''
-                            line[index] = "'\\''"
-                            line[index + 1] = ""
-                            line[index + 2] = ""
-                            line[index + 3] = ""
-                    except IndexDefect:
-                        discard
-                    # if is ""
-                    try:
-                        if line[index..index+2] == ["\"", "\""]:
+                        if char_group == "\"\"":
                             raise newException(ValueError, fmt"empty char detected (and is not allowed), lines[num]: {num + 1}, char: {index + 1}")
                     except IndexDefect:
                         discard
                     # replace " with '
                     line[index] = "'"
-                    break
 
         # dealing with strings
+            # if not in string and encounter ', replace with " and enter string
             if char == "'":
                 line[index] = "\""
                 in_str = true
@@ -133,7 +126,8 @@ for num, lIne in pairs(lines):
             # if " in a string, escape it
             if char == "\"":
                 line[index] = "\\\""
-            if char == "'" and line[index-1] != "\\":
+            # if ' in a string and is not escaped, swap it and exit string
+            if char_group == "'":
                 line[index] = "\""
                 in_str = false
         
