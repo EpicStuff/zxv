@@ -65,27 +65,29 @@ while true:
 # deal with indentation
 var indent = 0
 var comment = 0
+var in_char = false
 var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
     # split string into list of 1 long strings, unless escape character
-    var line = ssplit(lIne)
+    var line = ssplit(strip(lIne))
     # skip empty lines
     if line == @[]:
         continue
     ## deal with comments
+    debugEcho "line starts with: ", line[0], "comment: ", comment
     # check if is start of multiline comment (if line, ignoring indentation starts with #[)
-    if line[0..1].join() == "#[":
+    if line[0] == "#[":
         comment += 1
     # check if is end of multiline comment
-    if line[^2..^1].join() == "]#" and comment > 0:
+    if line[^1]  == "]#" and comment > 0:
         comment -= 1
     # if is in a comment block, skip
     if comment > 0:
         continue
     if line[0] == "#":
-        #lines[num] = "  "
+        # lines[num] = ""
         continue
 
     ## deal with multiline strings
@@ -96,13 +98,18 @@ for num, lIne in pairs(lines):
     for index, char_group in pairs(line):
         ## swap quotes
         # dealing with characters
+        if in_char:
+            if char_group == "'":
+                line[index] = "\\'";
+            in_char = false
+            continue;
         # if not in a string/char and encounter `"`
         if not in_str:
             if char_group == "\"":
                 block a:
                     # if is "\"" or """
                     try:
-                        if char_group =="\"\\\"\"" or char_group == "\"\"\"":
+                        if char_group == "\"\\\"\"" or char_group == "\"\"\"":
                             # replace with '\''
                             line[index] = "'\\''"
                             break a
@@ -116,15 +123,15 @@ for num, lIne in pairs(lines):
                         discard
                     # replace " with '
                     line[index] = "'"
-
+                    in_char = true
         # dealing with strings
             # if not in string and encounter ', replace with " and enter string
-            if char == "'":
+            if char_group == "'":
                 line[index] = "\""
                 in_str = true
         else:
             # if " in a string, escape it
-            if char == "\"":
+            if char_group == "\"":
                 line[index] = "\\\""
             # if ' in a string and is not escaped, swap it and exit string
             if char_group == "'":

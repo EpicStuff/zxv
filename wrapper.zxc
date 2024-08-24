@@ -64,12 +64,13 @@ while true:
 # deal with indentation
 var indent = 0
 var comment = 0
+var in_char = false
 var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
 	# split string into list of 1 long strings, unless escape character
-	var line = ssplit(lIne)
+	var line = ssplit(strip(lIne))
 	# skip empty lines
 	if line == @[]:
 		continue;
@@ -85,7 +86,7 @@ for num, lIne in pairs(lines):
 		continue;
 	# if is single line comment (if line, ignoring indentation starts with #), replace with blank line
 	if line[0] == '#':
-		#lines[num] = '  '
+		# lines[num] = ''
 		continue;
 
 	## deal with multiline strings
@@ -96,6 +97,11 @@ for num, lIne in pairs(lines):
 	for index, char_group in pairs(line):
 		## swap quotes
 		# dealing with characters
+		if in_char:
+			if char_group == '\'':
+				line[index] = '\\\'';
+			in_char = false
+			continue;
 		# if not in a string/char and encounter `"`
 		if not in_str:
 			if char_group == '"':
@@ -116,6 +122,7 @@ for num, lIne in pairs(lines):
 						discard;
 					# else, replace " with '
 					line[index] = '\'';;
+					in_char = true
 		# dealing with strings
 			# if not in string and encounter ', replace with " and enter string
 			if char_group == '\'':
