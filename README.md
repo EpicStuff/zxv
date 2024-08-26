@@ -43,6 +43,8 @@ else:
 - create/fork (vscode) linter/formatter
 	- make it suggest the snake case version instead of camelcase
 - add fancy support for indents in multiline strings where the tabs dont end up getting "parsed" (if nim doesn't do this allready)
+- forbid indentation with spaces
+- future future plan: add support for reusing variables, unless I can find good reason why nim doesn't allow this
 
 ## Stuff
 - i'd love any contributions (as long as matches my views on what the "correct" programming formmating is)

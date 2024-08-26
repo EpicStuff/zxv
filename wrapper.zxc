@@ -19,25 +19,15 @@
 		system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
 		- proper indentation with tabs is still recommended
 
-	To Do:
-		- make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line
-		- add support for ##[, ]##, and #?
-		- make it (default, optionaly) compile straight to binary instead of to nim
-
 	Notes (to self):
 		- ' = string
 		- " = char
-
-	Future plans:
-		- add recursion so that you can import/include .zxc files
-		- create/fork (vscode) linter/formatter
-		- add fancy support for indents in multiline strings where the tabs dont end up getting "parsed" 
 ]#
 
 import os, strutils, std/strformat, strslice
 include stuff
 
-const indentation = '    '
+const indentation = '  '
 
 # get command line parameters
 var params = commandLineParams()
