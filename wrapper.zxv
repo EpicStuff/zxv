@@ -1,5 +1,5 @@
 #[
-	this is a "compiler" for my custom language which I am calling zxc for now
+	this is a "compiler" for my custom language which I am calling zxv for now
 	it's basically nim but with a few styles changes to match my preference
 
 	Changes:
@@ -60,7 +60,7 @@ var in_str = false
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
-	debugEcho 'checking line: ', num
+	#debugEcho 'checking line: ', num
 	# split string into list of 1 long strings, unless escape character
 	var line = ssplit(strip(lIne))
 	# skip empty lines
@@ -85,7 +85,7 @@ for num, lIne in pairs(lines):
 	## if not in a comment/string block
 	# go character by character
 	for index, char_group in pairs(line):
-		debugEcho '\tchecking ', index, 'th char group: ', char_group, '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
+		#debugEcho '\tchecking ', index, 'th char group: ', char_group, '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
 		## swap quotes
 		# dealing with characters
 		if in_char:
@@ -151,4 +151,4 @@ for num, lIne in pairs(lines):
 	lines[num] = line.join();
 
 # save the code
-writeFile(file.replace('.zxc', '.nim'), lines.join('\n'))
+writeFile(file.replace('.zxv', '.nim'), lines.join('\n'))
