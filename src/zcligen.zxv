@@ -1,0 +1,32 @@
+import cligen
+
+proc compile(args: seq[string]) =
+	if args.len != 1:
+		echo 'error: compile needs exactly one input file'
+		echo 'Usage: zxv c <input>'
+		quit 1;
+	let input = args[0]
+	echo 'Compiling: ' & input;
+
+proc run(args: seq[string]) =
+	if args.len != 1:
+		echo 'error: run needs exactly one input file'
+		echo 'Usage: zxv r <input>'
+		quit 1;
+	let input = args[0]
+	echo 'Running: ' & input;
+
+proc convert(args: seq[string]) =
+	if args.len != 1:
+		echo 'error: convert needs exactly one input file'
+		echo 'Usage: zxv C <input>'
+		quit 1;
+	let input = args[0]
+	echo 'Converting: ' & input;
+
+when isMainModule:
+	dispatchMulti(
+		[compile, cmdName = "c"],
+		[run,     cmdName = "r"],
+		[convert, cmdName = "C"],
+	);

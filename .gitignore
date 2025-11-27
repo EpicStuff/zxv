@@ -7,3 +7,5 @@ tmp
 .vscode/
 .theia/
 .trunk/
+
+!build/wrapper.nim

@@ -1,0 +1,69 @@
+# import argparse
+
+# var p = newParser:
+# 	flag('-h', '--help')
+# 	command('c', 'compile'):
+# 		arg('input');
+# 	command('r', 'run'):
+# 		arg('cinput');;
+# 	# command('C', 'convert'):
+# 	# 	arg('input');;
+
+# debugEcho p.parse()
+
+
+# import argparse
+
+# var p = newParser('zxv'):
+# 	help('zxv source language tool')
+# 	command('compile'):
+# 		help('Compile a zxv file')
+# 		arg('input', help = 'input zxv file')
+# 		run:
+# 			echo 'Compiling: ' & opts.input;;
+# 	command('run'):
+# 		help('Run a zxv file')
+# 		arg('input', help = 'input zxv file')
+# 		run:
+# 			echo 'Running: ' & opts.input;;
+# 	command('convert'):
+# 		help('Convert a zxv file')
+# 		arg('input', help = 'input zxv file')
+# 		run:
+# 			echo 'Converting: ' & opts.input;;;
+
+
+# p.run()
+
+
+
+import argparse
+
+const version = '0.0.1'
+
+template compile_command(name: string) =
+	command(name):
+		help 'Compile zxv source file'
+		arg 'input'
+		# flag '-v' '--verbose' help='Enable verbose output'
+		run:
+			echo(opts.input)
+		;
+	;
+;
+
+
+var p = newParser:
+	# global options
+	# flag('-v', '--verbose', help='Enable verbose output.')
+	option('-o', '--output', help='Specify output file.')
+	option('-t', '--tmp_folder', help='Specify temporary folder.')
+	flag('--version', help='Show version and exit.')
+
+	# zxv c | compile <input> [options]
+	compile_command 'compile'
+	compile_command 'c'
+;
+
+when isMainModule:
+	p.run()

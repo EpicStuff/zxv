@@ -1,0 +1,137 @@
+import std/[os]
+import docopt, docopt/dispatch
+
+
+proc format()
+proc compile(input: string, verbose: bool, output: string, tmp_folder: string)
+proc run(input: string, args: Table)
+proc convert(input: string, args: Table)
+
+
+const version = '0.0.1'
+
+proc main() =
+  const doc = '''
+		zxv
+		a basic desc of zxv.
+
+		Usage:
+			zxv <command> [<args>...]
+			zxv -h, --help
+			zxv --version
+
+		Commands:
+			format, f   [-v] <input> [-o <output>]
+			compile, c  [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+			run, r      [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+			convert, C  [-v] [-f <format>] [-t <folder>] <input> [-o <output>] -- [<args>...]
+
+		Options:
+			-h, --help                 Show this.
+			--version                  Show version.
+			-v, --verbose              Enable verbose output.
+			-o <output>                Specify output file.
+			-t, --tmp_folder <folder>  Specify temporary folder. [default: {temp}]
+			-f, --format <format>      Specify output format. [default: nim]
+
+			Arguments after -- are passed onto nim.
+'''
+	# if no args, print full help and exit cleanly
+	if commandLineParams().len == 0:
+		echo doc
+		quit 0
+	;
+	# else
+	let args = docopt(doc, version = version)
+	echo args
+
+	args.dispatchProc compile, 'c'
+	args.dispatchProc compile
+	# args.dispatchProc run, 'r'
+	# args.dispatchProc run
+	# args.dispatchProc convert, 'C'
+	# args.dispatchProc convert
+
+	# use case?
+	if args['<command>'] == 'format':
+		fromat()
+	;
+;
+
+proc format() =
+  const doc = '''
+		format zxv input
+
+		Usage:
+			zxv {command} [-v] <input> [-o <output>]
+			zxv {command} -h, --help    Show extended help.
+
+		Options:
+			-h, --help         Show this.
+			-v, --verbose      Enable verbose output.
+			-o <output>        Specify output file.
+	'''
+proc compile(input: string, verbose: bool, output: string, tmp_folder: string, args: array) =
+  const doc = '''
+		compile input
+
+		Usage:
+			zxv {command} [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+			zxv {command} -h, --help    Show extended help.
+
+		Options:
+			-h, --help         Show this.
+			-v, --verbose      Enable verbose output.
+			-o <output>       Specify output file.
+			-t, --tmp_folder <folder>  Specify temporary folder. [default: {temp}]
+
+			Arguments after -- are passed onto nim.
+	'''
+	
+	# compile the input file
+	echo 'Compiling: ' & input
+;
+proc run(input: string, args: Table) =
+  const doc = '''
+		compile to tmp folder then run input
+
+		Usage:
+			zxv {command} [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+			zxv {command} -h, --help    Show extended help.
+
+		Options:
+			-h, --help         Show this.
+			-v, --verbose      Enable verbose output.
+			-o <output>       Specify output file.
+			-t, --tmp_folder <folder>  Specify temporary folder. [default: {temp}]
+
+			Arguments after -- are passed onto nim.
+	'''
+	# run the input file
+	echo 'Running: ' & input
+;
+proc convert(input: string, args: Table) =
+  const doc = '''
+		convert input to another format
+
+		Usage:
+			zxv {command} [-v] [--format=<format>] [--tmp_folder=<folder>] <input> [-o <output>] -- [<args>...]
+			zxv {command} -h, --help
+
+		Options:
+			-h, --help                 Show this.
+			-v, --verbose              Enable verbose output.
+			-o <output>                Specify output file.
+			-f, --format <format>      Specify output format. [default: nim]
+			-t, --tmp_folder <folder>  Specify temporary folder. [default: {temp}]
+
+			Arguments after -- are passed onto nim.
+	'''
+	
+	# convert the input file
+	echo 'Converting: ' & input
+;
+
+
+when isMainModule:
+	main()
