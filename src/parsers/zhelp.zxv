@@ -1,0 +1,71 @@
+const main* = '''
+	zxv
+	a basic desc of zxv.
+
+	Usage:
+		zxv <command> [<args>...]
+		zxv -h, --help
+		zxv --version
+
+	Commands:
+		format, f   [-v] <input> [-o <output>]
+		compile, c  [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+		run, r      [-v] [-t <folder>] <input> [-o <output>] -- [<args>...]
+		convert, C  [-v] [-f <format>] [-t <folder>] <input> [-o <output>] -- [<args>...]
+
+	Options:
+		-h, --help                 Show this.
+		--version                  Show version.
+		-v, --verbose              Enable verbose output.
+		-o, --output <output>      Specify output file.
+		-t, --tmp_folder <folder>  Specify temporary folder. [default: {temp}]
+		-f, --format <format>      Specify output format. [default: nim]
+
+		Arguments after -- are passed onto nim.
+'''
+
+let format* = '''
+	format zxv input
+
+	Usage:
+		zxv {command} [-v] <input> [-o <output>]
+		zxv {command} -h, --help
+
+	Options:
+		-h, --help             Show this.
+		-v, --verbose          Enable verbose output.
+		-o, --output <output>  Specify output file.
+'''
+
+let compile* = '''
+	compile input
+
+	Usage:
+		zxv {command} [-v] <input> [-o <output>] [-t <folder>] -- [<args>...]
+		zxv {command} -h, --help
+
+	Options:
+		-h, --help         Show this.
+		-v, --verbose      Enable verbose output.
+		-o, --output <output>       Specify output file.
+		-t <folder>, --tmp_folder <folder>  Specify temporary folder. [default: {getTempDir()}]
+
+		Arguments after -- are passed onto nim.
+'''
+
+let convert* = '''
+	convert input to another format
+
+	Usage:
+		zxv {command} [-v] <input> [<format>] [-t <folder>] [-o <output>] -- [<args>...]
+		zxv {command} -h, --help
+
+	Options:
+		-h, --help                 Show this.
+		-v, --verbose              Enable verbose output.
+		-o, --output <output>      Specify output file.
+		-f, --format <format>      Specify output format. [default: nim]
+		-t, --tmp_folder <folder>  Specify temporary folder. [default: {getTempDir()}]
+
+		Arguments after -- are passed onto nim.
+'''

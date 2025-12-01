@@ -1,0 +1,150 @@
+# import cligen
+
+# proc compile(args: seq[string]) =
+# 	if args.len != 1:
+# 		echo 'error: compile needs exactly one input file'
+# 		echo 'Usage: zxv c <input>'
+# 		quit 1;
+# 	let input = args[0]
+# 	echo 'Compiling: ' & input;
+
+# proc run(args: seq[string]) =
+# 	if args.len != 1:
+# 		echo 'error: run needs exactly one input file'
+# 		echo 'Usage: zxv r <input>'
+# 		quit 1;
+# 	let input = args[0]
+# 	echo 'Running: ' & input;
+
+# proc convert(args: seq[string]) =
+# 	if args.len != 1:
+# 		echo 'error: convert needs exactly one input file'
+# 		echo 'Usage: zxv C <input>'
+# 		quit 1;
+# 	let input = args[0]
+# 	echo 'Converting: ' & input;
+
+# when isMainModule:
+# 	dispatchMulti(
+# 		[compile, cmdName = "c"],
+# 		[run,     cmdName = "r"],
+# 		[convert, cmdName = "C"],
+# 	);
+
+
+import std/[os, strutils]
+
+const version = '0.0.1'
+
+proc format_cmd(verbose = false, output = '', args: seq[string]): int =
+	## format zxv input
+	if args.len == 0:
+		stderr.writeLine 'zxv format: missing <input>'
+		return 1
+	;
+	let input = args[0]
+	echo 'Formatting...'
+	echo 'input: ', input
+	if output.len > 0:
+		echo 'output: ', output
+	;
+	return 0
+;
+
+proc compile_cmd(verbose = false, tmp_folder = getTempDir(), output = '', args: seq[string]): int =
+	## compile input
+	if args.len == 0:
+		stderr.writeLine 'zxv compile: missing <input>'
+		return 1
+	;
+	let input = args[0]
+
+	var nim_args: seq[string] = @[]
+	if args.len > 1:
+		nim_args = args[1..^1]
+	;
+
+	echo 'Compiling: ', input
+	echo 'verbose: ', verbose
+	echo 'tmp_folder: ', tmp_folder
+	if output.len > 0:
+		echo 'output: ', output
+	;
+	if nim_args.len > 0:
+		echo 'forwarding to nim: ', nim_args.join(' ')
+	;
+	return 0
+;
+
+proc run_cmd(verbose = false, tmp_folder = getTempDir(), output = '', args: seq[string]): int =
+	## compile to tmp folder then run input
+	if args.len == 0:
+		stderr.writeLine 'zxv run: missing <input>'
+		return 1
+	;
+	let input = args[0]
+
+	var nim_args: seq[string] = @[]
+	if args.len > 1:
+		nim_args = args[1..^1]
+	;
+
+	echo 'Running: ', input
+	echo 'verbose: ', verbose
+	echo 'tmp_folder: ', tmp_folder
+	if output.len > 0:
+		echo 'output: ', output
+	;
+	if nim_args.len > 0:
+		echo 'forwarding to nim: ', nim_args.join(' ')
+	;
+	return 0
+;
+
+proc convert_cmd(format = 'nim', verbose = false, tmp_folder = getTempDir(), output = '', args: seq[string]): int =
+	## convert input to another format
+	if args.len == 0:
+		stderr.writeLine 'zxv convert: missing <input>'
+		return 1
+	;
+	let input = args[0]
+
+	var nim_args: seq[string] = @[]
+	if args.len > 1:
+		nim_args = args[1..^1]
+	;
+
+	echo 'Converting: ', input
+	echo 'format: ', format
+	echo 'verbose: ', verbose
+	echo 'tmp_folder: ', tmp_folder
+	if output.len > 0:
+		echo 'output: ', output
+	;
+	if nim_args.len > 0:
+		echo 'forwarding to nim: ', nim_args.join(' ')
+	;
+	return 0
+;
+
+when isMainModule:
+	import cligen
+
+	# make zxv --version work
+	clCfg.version = version
+
+	# subcommands:;
+	#	zxv format|f [...]
+	#	zxv compile|c [...]
+	#	zxv run|r [...]
+	#	zxv convert [...]
+	dispatchMulti(
+		[format_cmd,  cmdName = 'format'],
+		[format_cmd,  cmdName = 'f'],
+		[compile_cmd, cmdName = 'compile'],
+		[compile_cmd, cmdName = 'c'],
+		[run_cmd,     cmdName = 'run'],
+		[run_cmd,     cmdName = 'r'],
+		[convert_cmd, cmdName = 'convert']
+	)
+;

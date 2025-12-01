@@ -1,0 +1,82 @@
+proc format*(input: string, output = '', verbose=false) = 
+	echo 'format, ' & input & ', ' & output & ', ' & $verbose
+;
+proc compile*(input: string, output = '', tmp_folder='', verbose=false) = 
+	echo 'compile, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
+;
+proc zrun*(input: string, output = '', tmp_folder='', verbose=false) = 
+	echo 'run, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
+;
+proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) = 
+	echo 'convert, ' & input & ', ' & output & ', ' & format & ', ' & tmp_folder & ', ' & $verbose
+;
+
+type
+	TokenKind = enum
+		tString,     # '...' or "..."
+		tChar,       # c'...' or c"..."
+		tEqual,      # =
+		tColon,      # :
+		tSemi,       # ;
+		tNewline,    # \n
+		tComment,    # #... or #[ ... ]#
+		tOther,
+		tEOF
+
+	Token = object
+		text: string        # raw text for this token
+		kind: TokenKind
+
+proc main() =
+	# tokenize code
+
+proc load_file(filename: string): string =
+	discard
+;
+
+proc tokenize(code: string, verbose=false): seq[Token] =
+	var tokens: seq[Token]
+	var skip = 0
+	# for each char in string
+	for index, char in pairs(str):
+		block a:
+			#debugEcho index, 'st char, ', char, ', skip: ', skip
+			if skip > 0:
+				skip -= 1
+				continue
+			;
+			# compare each char to each special
+			for special in specials:
+				block b:
+					#debugEcho '\tchecking: \'', special, '\''
+					try:
+						# take the first char in special
+						for num, spe in special:
+							#debugEcho '\t\tmatching: ', spe
+							# if special is a star, auto match
+							if spe == "*":
+								continue
+							;
+							# if they dont match, move on to the next special
+							if spe != str[index + num]:
+								break b
+							;
+						;
+						# if match
+						#debugEcho '\tmatch'
+						var len = special.len - 1
+						sstr.add(str[index..index+len])
+						skip += len
+						break a
+					;
+					except IndexDefect:
+						discard
+					;
+				;
+			;
+			#debugEcho '\tno match'
+			sstr.add($char)
+		;
+	;
+	return sstr
+;

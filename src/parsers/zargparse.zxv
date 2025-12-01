@@ -1,0 +1,71 @@
+import std/[os, strformat]
+import argparse
+
+import zhelp, usage, ../main
+from ../main import format, compile, zrun, convert
+
+var parser = newParser('zxv'):
+	help('placeholder text')
+	command('format'):
+		flag('-v', '--verbose')
+		arg('input')
+		option('-o', '--output')
+		run:
+			main.format(verbose=opts.verbose, input=opts.input, output=opts.output)
+		;
+	;
+	command('compile'):
+		flag('-v', '--verbose')
+		option('-t', '--tmp_folder')
+		arg('input')
+		option('-o', '--output')
+		run:
+			main.compile(verbose=opts.verbose, tmp_folder=opts.tmp_folder, input=opts.input, output=opts.output)
+		;
+	;
+	command('run'):
+		flag('-v', '--verbose')
+		option('-t', '--tmp_folder')
+		arg('input')
+		option('-o', '--output')
+		run:
+			main.zrun(verbose=opts.verbose, tmp_folder=opts.tmp_folder, input=opts.input, output=opts.output)
+		;
+	;
+	command('convert'):
+		flag('-v', '--verbose')
+		option('-f', '--format')
+		option('-t', '--tmp_folder')
+		arg('input')
+		option('-o', '--output')
+		run:
+			main.convert(verbose=opts.verbose, format=opts.format, tmp_folder=opts.tmp_folder, input=opts.input, output=opts.output)
+		;
+	;
+;
+
+
+# no args => print full help and exit cleanly
+if commandLineParams().len == 0:
+	# echo usage.main
+	quit 0
+;
+
+# parser.run()
+try:
+	# let opts = parser.run()
+	# echo opts
+	parser.run()
+;
+except ShortCircuit as err:
+	echo err.flag 
+	if err.flag == 'argparse_help':
+		# custom help header
+		echo zhelp.main
+		quit 0
+	;
+;
+except UsageError:
+	echo zhelp.main
+	quit 1
+;
