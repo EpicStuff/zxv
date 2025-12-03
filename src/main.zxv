@@ -16,12 +16,14 @@ proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=f
 type#:
 	TokenKind = enum#:
 		tString,     # '...' or "..."
-		tChar,       # c'...' or c"..."
-		tEqual,      # =#
-		tColon,      # :#
+		tComment,    # #... or #[ ... ]#
+		# tChar,       # c'...' or c"..."
+		# tEqual,      # =#
+		# tColon,      # :#
+		tIndenter,   # symbols that increase indent level, :\n or =\n
+		tIndent,     # placeholder for tabs/spaces
 		tSemi,       # ;#
 		tNewline,    # \n
-		tComment,    # #... or #[ ... ]#
 		tOther,
 		tEOF
 	;
@@ -34,10 +36,10 @@ type#:
 ;
 
 # proc load_file(filename: string): string =
-# 	return readFile(file)
+# return readFile(file)
 # ;
 
-proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', '\\*'], verbose=false): seq[string] =
+proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', ':\n', '=\n', '\\*'], verbose=false): seq[string] =
 	#[split a string into a list of individual words and symbols 
 		and symbol segments found in specials will be concidered as a single word
 		default specials are c'*', c"*", ''', """, #[, ]#, \*
@@ -75,7 +77,7 @@ proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']
 						# if match
 						var len = special.len - 1
 						if verbose: echo '\n\t', special, ' matched, adding: ', join(rstr[index..index+len], '')
-						strs.add(join(rstr[index..index+len], ''))
+						strs.add(rstr[index..index+len].join(''))
 						# echo 'strs: ', strs
 						skip += len
 						break a
@@ -92,16 +94,16 @@ proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']
 	return strs
 ;
 
-proc tokenize(str: seq[string], verbose=true): seq[Token] =
+proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 	var tokens: seq[Token]
 	var counter = 0
 	var in_str = false
-	var in_comment = false
+	var in_comment = 0
 	# for each char_group in string
-	for index, group in pairs(str):
+	for index, group in pairs(strs):
 		if verbose: echo fmt'''group {index}: {group.replace('\t', '\\t').replace('\n', '\\n')}, in_str: {in_str}, in_comment: {in_comment}'''
 		# check each char_group
-		## string
+		## if string, and not comment
 		if not in_comment and group in ['\'', '"', '\'\'\'', '"""']:
 			# if not in string, enter string and record index
 			if not in_str:
@@ -114,30 +116,175 @@ proc tokenize(str: seq[string], verbose=true): seq[Token] =
 			;
 			in_str = not in_str
 		;
-		# if in string, skip rest of code
+		### if in string, skip rest of code
 		elif in_str:
 			continue
 		;
 		## multiline comment
+		### entering comment
 		if group == '#[':
-			
+			if in_comment == 0:
+				counter = index
+			;
+			in_comment += 2
 		;
-		## comment
+		### exiting comment
+		elif group == ']#':
+			if in_comment == 0:
+				echo 'Warning: unmatched ]#'
+			;
+			else:
+				in_comment -= 2
+			;
+			if in_comment == 0:
+				if verbose: echo fmt'joining comment from {counter} to {index}'
+				tokens.add Token(text: join(str[counter..index], ''), kind: tComment)
+			;
+		;
+		## single line comment
+		if group == '#' and in_comment == 0:
+			counter = index
+			in_comment = 1
+		;
+		if group == '\n' and in_comment == 1:
+			if verbose: echo fmt'adding single line comment from {counter} to {index}'
+			tokens.add Token(text: join(str[counter..index], ''), kind: tComment)
+			in_comment = 0
+		;
+		## if in comment, skip rest of code
+		if in_comment > 0:
+			continue
+		;
+		
+		## indentation
+		if group in [':\n', '=\n']:
+			tokens.add Token(text: group, kind: tIndent)
+		;
+		## semicolon
+		elif group == ';':
+			tokens.add Token(text: group, kind: tSemi)
+		;
+		## newline
+		elif group == '\n':
+			tokens.add Token(text: group, kind: tNewline)
+			tokens.add Token(kind: tIndent)
+		;
 		## other
-		tokens.add Token(text: group, kind: tOther)
+		else:
+			tokens.add Token(text: group, kind: tOther)
+		;
 	;
 	return tokens
+;
+
+proc indent(tokens: seq[Token], indentation = '  ', verbose=true): seq[Token] =
+	var indent = 0
+	if verbose: debugEcho ''
+	for group in tokens:
+		if verbose: debugEcho 'processing group: ', group.text.replace('\t', '\\t').replace('\n', '\\n'), ', indent: ', indent
+		if group.kind == tIndent:
+			# add indentation
+			group.text = repeat(indentation, indent)
+		;
+		elif group.kind == tIndenter:
+			indent += 1
+		;
+		elif group.kind == tSemi:
+			if indent > 0:
+				indent -= 1
+			;
+			else:
+				echo 'Warning: de-indenting below 0'
+			;
+		;
+	;
+;
+
+proc transform_string(tokens: seq[Token], verbose=true): seq[Token] =
+	for group in tokens:
+		# characters
+		if group.kind == tChar:
+			if group.text.len < 4:
+				echo 'Warning: too long char: ', group.text
+			;
+			# set quotes to " and escape inner "
+			group.text = fmt'''"{group.text[2..^2].replace('"', '\\"')}"'''
+		;
+		# strings
+		if group.kind == tString:
+			# multiline strings
+			if group.text[0..2] in ['\'\'\'', '"""']:
+				# if verbose: debugEcho '\ttransforming multiline string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
+				# set quotes to """ and escape inner """
+				group.text = fmt'''"""{group.text[3..^4].replace('"""', '\\"""')}"""'''  #'
+			;
+			# regular strings
+			else:
+				# if verbose: debugEcho '\ttransforming string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
+				# set quotes to " and escape inner "
+				group.text = fmt'''"{group.text[1..^2].replace('"', '\\"')}"'''
+			;
+		;
+	;
+;
+
+proc untokenize(tokens: seq[Token], verbose=true): string =
+	var str = ''
+	var last_token = Token(kind: tEOF)
+
+	# join tokens into string and deal with spaces
+	for token in tokens:
+		# no space before first token
+		if last_token.kind == tEOF:
+			discard
+		;
+		# no space after newline or indent
+		elif last_token.kind in [tNewline, tIndent]:
+			discard
+		;
+		# no space before newline or indent
+		elif token.kind in [tNewline, tIndent]:
+			discard
+		;
+		# no space before semicolon
+		elif token.kind == tSemi:
+			discard
+		;
+		# dauble space before single line comment
+		elif token.kind == tComment and not token.text.startsWith('#['):
+			str.add('  ')
+		;
+		# space between other tokens
+		else:
+			str.add(' ')
+		;
+
+		str.add(token.text)
+		last_token = token
+	;
+	return str
 ;
 
 proc main(file: string) =
 	# load code
 	let code = readFile(file)
-	# split codet
+	# split code into words/symbol groups
 	let scode = ssplit(code)
 	echo scode
 	# tokenize code
 	let tokens = tokenize(scode)
 	echo tokens
+	# indent code
+	let indented = indent(tokens)
+	echo indented
+	# transform strings
+	let transformed = transform_string(indented)
+	echo transformed
+	# untokenize code
+	code = untokenize(transformed)
+	echo code
+	# save code
+	writeFile(file.replace('.zxv', '.nim'), code)
 ;
 
 when isMainModule:
