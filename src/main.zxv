@@ -1,3 +1,5 @@
+import std/[os, strutils, strformat, re]
+
 proc format*(input: string, output = '', verbose=false) = 
 	echo 'format, ' & input & ', ' & output & ', ' & $verbose
 ;
@@ -11,61 +13,70 @@ proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=f
 	echo 'convert, ' & input & ', ' & output & ', ' & format & ', ' & tmp_folder & ', ' & $verbose
 ;
 
-type
-	TokenKind = enum
+type#:
+	TokenKind = enum#:
 		tString,     # '...' or "..."
 		tChar,       # c'...' or c"..."
-		tEqual,      # =
-		tColon,      # :
-		tSemi,       # ;
+		tEqual,      # =#
+		tColon,      # :#
+		tSemi,       # ;#
 		tNewline,    # \n
 		tComment,    # #... or #[ ... ]#
 		tOther,
 		tEOF
-
-	Token = object
+	;
+;
+type#:
+	Token = object#:
 		text: string        # raw text for this token
 		kind: TokenKind
-
-proc main() =
-	# tokenize code
-
-proc load_file(filename: string): string =
-	discard
+	;
 ;
 
-proc tokenize(code: string, verbose=false): seq[Token] =
-	var tokens: seq[Token]
+# proc load_file(filename: string): string =
+# 	return readFile(file)
+# ;
+
+proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', '\\*'], verbose=false): seq[string] =
+	#[split a string into a list of individual words and symbols 
+		and symbol segments found in specials will be concidered as a single word
+		default specials are c'*', c"*", ''', """, #[, ]#, \*
+		* means any single char
+	]#
+	var strs: seq[string]  # string sequence
 	var skip = 0
-	# for each char in string
-	for index, char in pairs(str):
+	let rstr = re.findall(str, re'\w+|\r\n|\n|[^\w\s]')
+	# for each word/symbol in string
+	for index, group in pairs(rstr):
 		block a:
-			#debugEcho index, 'st char, ', char, ', skip: ', skip
+			if verbose: echo 'group ', index, ': ', group, ', skip: ', skip
 			if skip > 0:
 				skip -= 1
 				continue
 			;
 			# compare each char to each special
+			if verbose: stdout.write '\tchecking: '
 			for special in specials:
 				block b:
-					#debugEcho '\tchecking: \'', special, '\''
+					if verbose: stdout.write special & ', '
 					try:
 						# take the first char in special
-						for num, spe in special:
-							#debugEcho '\t\tmatching: ', spe
+						for num, chspe in special:
 							# if special is a star, auto match
-							if spe == "*":
+							if chspe == "*":
 								continue
 							;
 							# if they dont match, move on to the next special
-							if spe != str[index + num]:
+							if $chspe != rstr[index + num]:
 								break b
 							;
+							if verbose: stdout.write 'matched: ', chspe
 						;
 						# if match
-						#debugEcho '\tmatch'
 						var len = special.len - 1
-						sstr.add(str[index..index+len])
+						if verbose: echo '\n\t', special, ' matched, adding: ', join(rstr[index..index+len], '')
+						strs.add(join(rstr[index..index+len], ''))
+						# echo 'strs: ', strs
 						skip += len
 						break a
 					;
@@ -74,9 +85,61 @@ proc tokenize(code: string, verbose=false): seq[Token] =
 					;
 				;
 			;
-			#debugEcho '\tno match'
-			sstr.add($char)
+			if verbose: echo '\tno match'
+			strs.add(group)
 		;
 	;
-	return sstr
+	return strs
 ;
+
+proc tokenize(str: seq[string], verbose=true): seq[Token] =
+	var tokens: seq[Token]
+	var counter = 0
+	var in_str = false
+	var in_comment = false
+	# for each char_group in string
+	for index, group in pairs(str):
+		if verbose: echo fmt'''group {index}: {group.replace('\t', '\\t').replace('\n', '\\n')}, in_str: {in_str}, in_comment: {in_comment}'''
+		# check each char_group
+		## string
+		if not in_comment and group in ['\'', '"', '\'\'\'', '"""']:
+			# if not in string, enter string and record index
+			if not in_str:
+				counter = index
+			;
+			# else, exiting string
+			else:
+				if verbose: echo fmt'joining from {counter} to {index}'
+				tokens.add Token(text: join(str[counter..index], ''), kind: tString)
+			;
+			in_str = not in_str
+		;
+		# if in string, skip rest of code
+		elif in_str:
+			continue
+		;
+		## multiline comment
+		if group == '#[':
+			
+		;
+		## comment
+		## other
+		tokens.add Token(text: group, kind: tOther)
+	;
+	return tokens
+;
+
+proc main(file: string) =
+	# load code
+	let code = readFile(file)
+	# split codet
+	let scode = ssplit(code)
+	echo scode
+	# tokenize code
+	let tokens = tokenize(scode)
+	echo tokens
+;
+
+when isMainModule:
+	echo 'running'
+	main('tests/test.zxv')

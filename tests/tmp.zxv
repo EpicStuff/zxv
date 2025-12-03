@@ -1,0 +1,7 @@
+proc 'test': int =
+	'''
+		comment
+	'''
+;
+
+fmt'\''

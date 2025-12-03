@@ -13,10 +13,10 @@ type
 		text: string        # raw text for this token
 		kind: TokenKind
 
-proc ssplit(str: string, specials = ['c\'', 'c"', '\'\'\'', '"""', '#[', ']#', '\\\''], verbose=false): seq[string] =
+proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', '\\*'], verbose=false): seq[string] =
 	# split a string into a list of individual words and symbols 
 	# and string segment found in special will be concidered as a single word
-	# default specials are c', c", ''', """, #[, ]#, \'
+	# default specials are c'*', c"*", ''', """, #[, ]#, \*
 	var sstr: seq[string]
 	var skip = 0
 	# for each char in string
