@@ -1,4 +1,5 @@
 import std/[os, strutils, strformat, re]
+import utils
 
 proc format*(input: string, output = '', verbose=false) = 
 	echo 'format, ' & input & ', ' & output & ', ' & $verbose
@@ -16,8 +17,8 @@ proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=f
 type#:
 	TokenKind = enum#:
 		tString,     # '...' or "..."
+		tChar,       # c'...' or c"..."
 		tComment,    # #... or #[ ... ]#
-		# tChar,       # c'...' or c"..."
 		# tEqual,      # =#
 		# tColon,      # :#
 		tIndenter,   # symbols that increase indent level, :\n or =\n
@@ -47,7 +48,7 @@ proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']
 	]#
 	var strs: seq[string]  # string sequence
 	var skip = 0
-	let rstr = re.findall(str, re'\w+|\r\n|\n|[^\w\s]')
+	let rstr = re.findall(str, re'\w+|\r\n|\n|\s|[^\w\s]')
 	# for each word/symbol in string
 	for index, group in pairs(rstr):
 		block a:
@@ -95,16 +96,17 @@ proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']
 ;
 
 proc tokenize(strs: seq[string], verbose=true): seq[Token] =
+	if verbose: echo 'Tokenizing:'
 	var tokens: seq[Token]
 	var counter = 0
 	var in_str = false
 	var in_comment = 0
 	# for each char_group in string
 	for index, group in pairs(strs):
-		if verbose: echo fmt'''group {index}: {group.replace('\t', '\\t').replace('\n', '\\n')}, in_str: {in_str}, in_comment: {in_comment}'''
+		if verbose: echo fmt'''group {index}: {group.escape_str()}, in_str: {in_str}, in_comment: {in_comment}'''
 		# check each char_group
-		## if string, and not comment
-		if not in_comment and group in ['\'', '"', '\'\'\'', '"""']:
+		# # if string, and not comment
+		if in_comment == 0 and group in ['\'', '"', '\'\'\'', '"""']:
 			# if not in string, enter string and record index
 			if not in_str:
 				counter = index
@@ -112,23 +114,23 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 			# else, exiting string
 			else:
 				if verbose: echo fmt'joining from {counter} to {index}'
-				tokens.add Token(text: join(str[counter..index], ''), kind: tString)
+				tokens.add Token(text: join(strs[counter..index], ''), kind: tString)
 			;
 			in_str = not in_str
 		;
-		### if in string, skip rest of code
+		# ## if in string, skip rest of code
 		elif in_str:
 			continue
 		;
-		## multiline comment
-		### entering comment
+		# # multiline comment
+		# ## entering comment
 		if group == '#[':
 			if in_comment == 0:
 				counter = index
 			;
 			in_comment += 2
 		;
-		### exiting comment
+		# ## exiting comment
 		elif group == ']#':
 			if in_comment == 0:
 				echo 'Warning: unmatched ]#'
@@ -138,38 +140,42 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 			;
 			if in_comment == 0:
 				if verbose: echo fmt'joining comment from {counter} to {index}'
-				tokens.add Token(text: join(str[counter..index], ''), kind: tComment)
+				tokens.add Token(text: join(strs[counter..index], ''), kind: tComment)
 			;
 		;
-		## single line comment
+		# # single line comment
 		if group == '#' and in_comment == 0:
 			counter = index
 			in_comment = 1
 		;
 		if group == '\n' and in_comment == 1:
 			if verbose: echo fmt'adding single line comment from {counter} to {index}'
-			tokens.add Token(text: join(str[counter..index], ''), kind: tComment)
+			tokens.add Token(text: join(strs[counter..index], ''), kind: tComment)
 			in_comment = 0
 		;
-		## if in comment, skip rest of code
+		# # if in comment, skip rest of code
 		if in_comment > 0:
 			continue
 		;
 		
-		## indentation
+		# # char
+		if group.len > 1 and group[0..1] in ['c\'', 'c"']: #":
+			tokens.add Token(text: group, kind: tChar)
+		;
+		# # indentation
 		if group in [':\n', '=\n']:
 			tokens.add Token(text: group, kind: tIndent)
 		;
-		## semicolon
+		# # semicolon
 		elif group == ';':
 			tokens.add Token(text: group, kind: tSemi)
 		;
-		## newline
+		# # newline
 		elif group == '\n':
 			tokens.add Token(text: group, kind: tNewline)
 			tokens.add Token(kind: tIndent)
 		;
-		## other
+		# # other
 		else:
 			tokens.add Token(text: group, kind: tOther)
 		;
@@ -177,10 +183,11 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 	return tokens
 ;
 
-proc indent(tokens: seq[Token], indentation = '  ', verbose=true): seq[Token] =
+proc indent(tokens: var seq[Token], indentation = '  ', verbose=true) =
+	if verbose: echo 'Indenting:'
 	var indent = 0
 	if verbose: debugEcho ''
-	for group in tokens:
+	for group in mitems tokens:
 		if verbose: debugEcho 'processing group: ', group.text.replace('\t', '\\t').replace('\n', '\\n'), ', indent: ', indent
 		if group.kind == tIndent:
 			# add indentation
@@ -199,16 +206,22 @@ proc indent(tokens: seq[Token], indentation = '  ', verbose=true): seq[Token] =
 		;
 	;
 ;
+proc indent(tokens: seq[Token], indentation = '  ', verbose=true): seq[Token] =
+	var new_tokens = tokens
+	indent(new_tokens, indentation, verbose)
+	return new_tokens
+;
 
-proc transform_string(tokens: seq[Token], verbose=true): seq[Token] =
-	for group in tokens:
+proc transform_string(tokens: var seq[Token], verbose=true) =
+	if verbose: echo 'Transforming strings:'
+	for group in mitems tokens:
 		# characters
 		if group.kind == tChar:
 			if group.text.len < 4:
 				echo 'Warning: too long char: ', group.text
 			;
 			# set quotes to " and escape inner "
-			group.text = fmt'''"{group.text[2..^2].replace('"', '\\"')}"'''
+			group.text = fmt'''\"{group.text[2..^2].replace("\"", "\\\"")}\"'''
 		;
 		# strings
 		if group.kind == tString:
@@ -216,58 +229,71 @@ proc transform_string(tokens: seq[Token], verbose=true): seq[Token] =
 			if group.text[0..2] in ['\'\'\'', '"""']:
 				# if verbose: debugEcho '\ttransforming multiline string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
 				# set quotes to """ and escape inner """
-				group.text = fmt'''"""{group.text[3..^4].replace('"""', '\\"""')}"""'''  #'
+				group.text = fmt'''\"\"\"{group.text[3..^4].replace("\"\"\"", "\\\"\"\"")}\"\"\"'''
 			;
 			# regular strings
 			else:
 				# if verbose: debugEcho '\ttransforming string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
 				# set quotes to " and escape inner "
-				group.text = fmt'''"{group.text[1..^2].replace('"', '\\"')}"'''
+				group.text = fmt'''\"{group.text[1..^2].replace("\"", "\\\"")}\"'''
 			;
 		;
 	;
 ;
+proc transform_string(tokens: seq[Token], verbose=true): seq[Token] =
+	var new_tokens = tokens
+	transform_string(new_tokens, verbose)
+	return new_tokens
+;
 
 proc untokenize(tokens: seq[Token], verbose=true): string =
+	if verbose: echo 'Untokenizing:'
 	var str = ''
 	var last_token = Token(kind: tEOF)
 
-	# join tokens into string and deal with spaces
-	for token in tokens:
-		# no space before first token
-		if last_token.kind == tEOF:
-			discard
-		;
-		# no space after newline or indent
-		elif last_token.kind in [tNewline, tIndent]:
-			discard
-		;
-		# no space before newline or indent
-		elif token.kind in [tNewline, tIndent]:
-			discard
-		;
-		# no space before semicolon
-		elif token.kind == tSemi:
-			discard
-		;
-		# dauble space before single line comment
-		elif token.kind == tComment and not token.text.startsWith('#['):
-			str.add('  ')
-		;
-		# space between other tokens
-		else:
-			str.add(' ')
-		;
+	# # join tokens into string and deal with spaces
+	# for token in tokens:
+	# 	# no space before first token
+	# 	if last_token.kind == tEOF:
+	# 		discard
+	# 	;
+	# 	# no space after newline or indent
+	# 	elif last_token.kind in [tNewline, tIndent]:
+	# 		discard
+	# 	;
+	# 	# no space before newline or indent
+	# 	elif token.kind in [tNewline, tIndent]:
+	# 		discard
+	# 	;
+	# 	# no space before semicolon
+	# 	elif token.kind == tSemi:
+	# 		discard
+	# 	;
+	# 	# dauble space before single line comment
+	# 	elif token.kind == tComment and not token.text.startsWith('#['):
+	# 		str.add('  ')
+	# 	;
+	# 	# space between other tokens
+	# 	else:
+	# 		str.add(' ')
+	# 	;
 
-		str.add(token.text)
-		last_token = token
+	# 	str.add(token.text)
+	# 	last_token = token
+	# ;
+	# return str
+
+	result = ''
+	for tok in tokens:
+		result.add(tok.text)
 	;
-	return str
+	return result
 ;
+
 
 proc main(file: string) =
 	# load code
-	let code = readFile(file)
+	var code = readFile(file)
 	# split code into words/symbol groups
 	let scode = ssplit(code)
 	echo scode
@@ -275,18 +301,23 @@ proc main(file: string) =
 	let tokens = tokenize(scode)
 	echo tokens
 	# indent code
-	let indented = indent(tokens)
-	echo indented
+	#let indented = indent(tokens)
+	#echo indented
 	# transform strings
-	let transformed = transform_string(indented)
-	echo transformed
+	#let transformed = transform_string(indented)
+	#echo transformed
 	# untokenize code
-	code = untokenize(transformed)
-	echo code
+	#code = untokenize(transformed)
+	#echo code
 	# save code
 	writeFile(file.replace('.zxv', '.nim'), code)
 ;
 
 when isMainModule:
-	echo 'running'
+	echo 'Starting:'
 	main('tests/test.zxv')
+
+# ToDo:
+	# - auto convert ## to # (documentation comments)
+	# - add support for fmt (code inside strings)
+	# - add support for include/import
