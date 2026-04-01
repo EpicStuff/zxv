@@ -1,4 +1,5 @@
+import std/strutils
+
 proc escape_str*(str: string): string =
-	let result = str.replace('\t', '\\t').replace('\n', '\\n').replace(' ', '\\s')
-	return result
+	return str.replace('\t', '\\t').replace('\n', '\\n').replace(' ', '\\s')
 ;
