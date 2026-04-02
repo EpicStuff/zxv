@@ -3,8 +3,8 @@ import utils
 
 
 # "list" of possible token types
-type#:
-	TokenKind = enum#:
+type:
+	TokenKind = enum:
 		tString,     # '...' or "..."
 		tChar,       # c'...' or c"..."
 		tComment,    # #... or #[ ... ]#
@@ -19,8 +19,8 @@ type#:
 	;
 ;
 # the token object
-type#:
-	Token = object#:
+type:
+	Token = object:
 		text: string        # raw text for this token
 		kind: TokenKind
 	;
@@ -166,11 +166,11 @@ proc tokenize(strs: seq[string], verbose=false): seq[Token] =
 		# deal with other stuff
 		# # char
 		if group.len > 1 and group[0..1] in ['c\'', 'c"']: #":
-			tokens.add Token(text: group.strip(trailing=false, chars={"c"}), kind: tChar)
+			tokens.add Token(text: group.strip(trailing=false, chars={c'c'}), kind: tChar)
 		;
 		# # indenter
 		elif group in ['type:', 'var:', 'enum:', 'object:']:
-			tokens.add Token(text: group.strip(false, chars={":"}), kind: tIndenter)
+			tokens.add Token(text: group.strip(false, chars={c':'}), kind: tIndenter)
 		;
 		# # semicolon/de indenter
 		elif group == ';':
@@ -319,42 +319,7 @@ proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 ;
 
 proc untokenize(tokens: seq[Token], verbose=false): string =
-	if verbose: echo 'Untokenizing:'
-	var str = ''
-	var last_token = Token(kind: tEOF)
-
-	# # join tokens into string and deal with spaces
-	# for token in tokens:
-	# 	# no space before first token
-	# 	if last_token.kind == tEOF:
-	# 		discard
-	# 	;
-	# 	# no space after newline or indent
-	# 	elif last_token.kind in [tNewline, tIndent]:
-	# 		discard
-	# 	;
-	# 	# no space before newline or indent
-	# 	elif token.kind in [tNewline, tIndent]:
-	# 		discard
-	# 	;
-	# 	# no space before semicolon
-	# 	elif token.kind == tSemi:
-	# 		discard
-	# 	;
-	# 	# dauble space before single line comment
-	# 	elif token.kind == tComment and not token.text.startsWith('#['):
-	# 		str.add('  ')
-	# 	;
-	# 	# space between other tokens
-	# 	else:
-	# 		str.add(' ')
-	# 	;
-
-	# 	str.add(token.text)
-	# 	last_token = token
-	# ;
-	# return str
-
+	if verbose: echo 'Untokenizing'
 	result = ''
 	for tok in tokens:
 		if tok.kind != tSemi:
