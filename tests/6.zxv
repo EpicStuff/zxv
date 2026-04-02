@@ -1,0 +1,3 @@
+if: # semicolon then comment
+	discard
+;

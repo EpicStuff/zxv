@@ -1,0 +1,4 @@
+if nested:
+	if statement_test:
+		discard;
+;

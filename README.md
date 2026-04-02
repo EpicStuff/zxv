@@ -44,6 +44,16 @@ else:
 - still under development
 - `# comment` for comments, `#code` for commented out code 
 
+## Compiling
+
+### The Easy Way
+
+Download the latest binary and use that to "compile" all the `.zxv` files
+
+### The Hard Way
+
+
+
 ## To Do:
 - make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line (i think thats a thing in Nim)
 - add support for `##[`, `]##`, and `#?`

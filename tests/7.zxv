@@ -1,0 +1,21 @@
+# special indenters
+type:
+	TokenKind = enum:
+		tString,     # '...' or "..."
+		tChar,       # c'...' or c"..."
+		tComment,    # #... or #[ ... ]#
+		tIndenter,   # symbols that increase indent level, :\n or =\n
+		tIndent,     # placeholder for tabs/spaces
+		tSemi,       # ;#
+		tNewline,    # \n
+		tSpecial,    # tmp not other type
+		tOther,      # everything else
+		tEOF         # not super sure what this was originally used for but also for any leftover text
+	;
+;
+type:
+	Token = object:
+		text: string        # raw text for this token
+		kind: TokenKind
+	;
+;

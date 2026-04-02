@@ -84,7 +84,7 @@ proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']
 	return strs
 ;
 
-proc tokenize(strs: seq[string], verbose=true): seq[Token] =
+proc tokenize(strs: seq[string], verbose=false): seq[Token] =
 	if verbose: echo 'Tokenizing:'
 	var tokens: seq[Token]
 	var counter = 0
@@ -166,7 +166,7 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 		# deal with other stuff
 		# # char
 		if group.len > 1 and group[0..1] in ['c\'', 'c"']: #":
-			tokens.add Token(text: group, kind: tChar)
+			tokens.add Token(text: group.strip(trailing=false, chars={"c"}), kind: tChar)
 		;
 		# # indenter
 		elif group in ['type:', 'var:', 'enum:', 'object:']:
@@ -190,7 +190,7 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 			tokens.add Token(text: group, kind: tSpace)
 		;
 		# # special words/symbols, to be processed later
-		elif group in [':', '=']:
+		elif group in [':', '=', 'r', 're']:
 			tokens.add Token(text: group, kind: tSpecial)
 		;
 		# # other, not a special str
@@ -230,12 +230,12 @@ proc tokenize(strs: seq[string], verbose=true): seq[Token] =
 	return tokens
 ;
 
-proc indent(tokens: var seq[Token], indentation = '  ', verbose=true) =
+proc indent(tokens: var seq[Token], indentation = '  ', verbose=false) =
 	if verbose: echo 'Indenting:'
 	var indent_level = 0
 	if verbose: debugEcho ''
 	for group in mitems tokens:
-		if verbose: debugEcho 'processing group: ', group.text.replace('\t', '\\t').replace('\n', '\\n'), ', indent_level: ', indent_level, ', tkind: ', $group.kind
+		if verbose: debugEcho 'processing group: ', group.text.escape_str(), ', indent_level: ', indent_level, ', tkind: ', $group.kind
 		if group.kind == tIndent:
 			# add indentation
 			group.text = repeat(indentation, indent_level)
@@ -256,47 +256,69 @@ proc indent(tokens: var seq[Token], indentation = '  ', verbose=true) =
 		echo 'Warning: mismatched =/:'
 	;
 ;
-proc indent(tokens: seq[Token], indentation = '  ', verbose=true): seq[Token] =
+proc indent(tokens: seq[Token], indentation = '  ', verbose=false): seq[Token] =
 	var new_tokens = tokens
 	indent(new_tokens, indentation, verbose)
 	return new_tokens
 ;
 
-proc transform_string(tokens: var seq[Token], verbose=true) =
+proc transform_string(tokens: var seq[Token], verbose=false) =
+	#[
+		c''' -> '\''
+
+		'' -> ""
+		'"' -> "\""
+
+		'''''' -> """"""
+		'''"''' -> """\""""
+		'''""''' -> """\"\""""
+		'''"""''' -> """\""\""""
+	]#
 	if verbose: echo 'Transforming strings:'
 	for group in mitems tokens:
+		#if verbose and group.kind in {tString, tChar}: echo 'transforming: ', group.text.escape_str()
 		# characters
 		if group.kind == tChar:
-			if group.text.len < 4:
+			if group.text.len > 3:
 				echo 'Warning: too long char: ', group.text
 			;
 			# set quotes to " and escape inner "
-			group.text = fmt'''\"{group.text[2..^2].replace("\"", "\\\"")}\"'''
+			let inner = group.text[1..^2].replace('"', '\\"')  # using extra inner var since formatting fmt'' not yet implemented
+			group.text = "'" & inner & "'"
 		;
 		# strings
 		if group.kind == tString:
+			let regex = re(r'(?<!\\)(?:\\\\)*\K' & '"')  # matches all " with even # of preceding \, using & since wrapper auto escapes ", TODO: replace with raw "" once its supported
 			# multiline strings
-			if group.text[0..2] in ['\'\'\'', '"""']:
-				# if verbose: debugEcho '\ttransforming multiline string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
+			if group.text.len >= 3 and group.text[0..2] in ['\'\'\'', '"""']:
+				if verbose: debugEcho '\ttransforming multiline string: ', group.text.escape_str()
 				# set quotes to """ and escape inner """
-				group.text = fmt'''\"\"\"{group.text[3..^4].replace("\"\"\"", "\\\"\"\"")}\"\"\"'''
+				let inner = group.text[3..^4].replace(regex, '\\"')
+				group.text = '"""' & inner & '"""'
 			;
 			# regular strings
 			else:
-				# if verbose: debugEcho '\ttransforming string: ', group.text.replace('\t', '\\t').replace('\n', '\\n')
+				if verbose: debugEcho '\ttransforming string: ', group.text.escape_str()
+				# if is empty string
+				if group.text.len <= 2:
+					group.text = group.text.replace('\'', '"')
+				;
 				# set quotes to " and escape inner "
-				group.text = fmt'''\"{group.text[1..^2].replace("\"", "\\\"")}\"'''
+				else:
+					let inner = group.text[1..^2].replace(regex, '\\"')
+					group.text = '"' & inner & '"'
+				;
 			;
 		;
 	;
 ;
-proc transform_string(tokens: seq[Token], verbose=true): seq[Token] =
+proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 	var new_tokens = tokens
 	transform_string(new_tokens, verbose)
 	return new_tokens
 ;
 
-proc untokenize(tokens: seq[Token], verbose=true): string =
+proc untokenize(tokens: seq[Token], verbose=false): string =
 	if verbose: echo 'Untokenizing:'
 	var str = ''
 	var last_token = Token(kind: tEOF)
@@ -360,10 +382,10 @@ proc main(file: string, output = '') =
 	let indented = indent(tokens)
 	#echo indented
 	# transform strings
-	#let transformed = transform_string(indented)
+	let transformed = transform_string(indented)
 	#echo transformed
 	# untokenize code
-	code = untokenize(indented)
+	code = untokenize(transformed)
 	#echo code.replace('\t', '\\t')
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
 	if output == '':
@@ -393,8 +415,12 @@ proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=f
 when isMainModule:
 	echo 'Starting:'
 	main('tests/test.zxv')
+;
 
 # ToDo:
 	# - auto convert ## to # or : : (documentation comments)
 	# - add support for fmt (code inside strings)
+		# - make sure that r'string' works
 	# - add support for include/import
+	# - remove trailing spaces
+	# - maybe add support for #:

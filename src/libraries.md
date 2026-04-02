@@ -1,4 +1,4 @@
-argparse requirments:
+requirments:
 - commands:
 	- command alias
 		- invalidates argparse
@@ -8,3 +8,6 @@ argparse requirments:
 	- `zxv` should print full help
 	- `zxv wrong command` should print only usage
 	- `zxv c -h` prints help for only c
+
+nice to have:
+- reusable flags (-v for version, -[something else]v for verbose)
