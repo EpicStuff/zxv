@@ -128,7 +128,7 @@ while true:
 var indent = 0
 var comment = 0
 var in_char = false
-var in_str = 0  # 0 = not in string, 1 = in string, 2 = 1st line of multiline string, 3 = in multiline string, 4 = end of multiline string
+var in_str = 0  # 0 = not in string, 1 = in string, 2 = 1st line of multiline string, 3 = in multiline string, 4 = end of multiline string, 5 = same line multiline string
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
@@ -139,27 +139,11 @@ for num, lIne in pairs(lines):
 	if line == @[]:
 		continue
 	;
-	## deal with comments
-	# debugEcho ', line starts with: ', line[0], ', comment: ', comment
-	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
-	if line[0] == '#[':
-		comment += 1
-	;
-	# check if is end of multiline comment
-	if line[^1] == ']#' and comment > 0:
-		comment -= 1
-	;
-	# if is in a comment block or is a normal line comment, skip
-	if comment > 0 or line[0] == '#':
-        lines[num] = lines[num].replace('\t', indentation)
-		continue
-	;
 
 	## if not in a comment/string block
 	# go character by character
 	for index, char_group in pairs(line):
-		if verbose: debugEcho '\tchecking ', index, 'th char group: ', char_group.replace '\t', '\\t', '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
-		
+		if verbose: debugEcho '\tchecking ', index, 'th char group: ', char_group.replace('\t', '\\t'), '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
 		## swap quotes
 		# dealing with characters
 		if in_char:
@@ -171,10 +155,27 @@ for num, lIne in pairs(lines):
 		;
 		# if not in a string/char and encounter `"`
 		if in_str == 0:
+			## deal with comments
 			# deal with inline comments, skip rest of line
 			if char_group == '#':
 				break
 			;
+			# check if is start of multiline comment (if line, ignoring indentation starts with #[)
+			if char_group == '#[':
+				comment += 1
+				# indent += 1
+			;
+				# check if is end of multiline comment
+			if line[^1] == ']#' and comment > 0:
+				comment -= 1
+				# indent -= 1
+			;
+			# if is in a comment block or is a normal line comment, skip
+			if comment > 0 or line[0] == '#':
+				lines[num] = lines[num].replace('\t', indentation)
+				break
+			;
+
 			if char_group == '"':
 				block a:
 					# if is "\"" or """
@@ -244,8 +245,14 @@ for num, lIne in pairs(lines):
 		# tmp multiline string support, in_str == 2 or 3
 		else:
 			if char_group == '\'\'\'':
+				if verbose: debugEcho '\t\treplacing char group with """'
 				line[index] = '"""'
-				in_str = 4
+				if in_str == 3:
+					in_str = 4
+				;
+				else:
+					in_str = 5
+				;
 			;
 			else:
 				continue
@@ -257,11 +264,15 @@ for num, lIne in pairs(lines):
 	if verbose: debugEcho ''
 	if in_str notin [3, 4]:
 		# remove existing indentation
+		#if verbose: echo '\tremoving indentation:'
 		for index, char_group in pairs(line):
+			#if verbose: echo '\t\tchecking ', index, 'th char group: ', char_group.replace('\t', '\\t')
 			if char_group in @[' ', '\t']:
+				#if verbose: echo '\t\t\tindent found, char_group: ', char_group.replace('\t', '\\t')
 				line[index] = ''
 			;
 			else:
+				#if verbose: echo '\t\t\tindent not found, char_group: ', char_group.replace('\t', '\\t')
 				break
 			;
 		;
@@ -269,7 +280,10 @@ for num, lIne in pairs(lines):
 		line[0] = repeat(indentation, indent) & line[0]
 		# check for dedentation
 		if line[^1] == ':' or line[^1] == '=':
-			indent += 1;
+			if comment == 0:
+				indent += 1
+			;
+		;
 		for index in countdown(line.len - 1, 0):
 			if line[index] == '':
 				if verbose: debugEcho ', break'
@@ -278,7 +292,7 @@ for num, lIne in pairs(lines):
 			if verbose: stdout.write '\tchecking index: ', index, ', char: ', line[index][^1]
 			if line[index][^1] == ";":
 				line[index] = ''
-				if indent > 0:
+				if indent > 0 and comment == 0:
 					indent -= 1
 				;
 				if verbose: debugEcho ', dedenting, indent: ', indent
@@ -295,7 +309,7 @@ for num, lIne in pairs(lines):
 	if in_str == 2:
 		in_str = 3
 	;
-	elif in_str == 4:
+	elif in_str in [4, 5]:
 		in_str = 0
 	;
 ;
@@ -314,5 +328,5 @@ echo 'saving to ', file
 writeFile file, lines.join('\n')
 
 if compile:
-	discard execShellCmd 'nim c ' & file
+	discard execShellCmd 'nim c --styleCheck:usages ' & file
 ;
