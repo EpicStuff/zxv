@@ -1,10 +1,14 @@
 #[
-	this is a "compiler" for my custom language which I am calling zxv for now
+	this is a "compiler" for my "custom" language which I am calling zxv for now
 	it's basically nim but with a few styles changes to match my preference
+
+	Usage:
+		- `wrapper.zxv c [file]` to compile a file
+		- `wrapper.zxv -h` to get help  # TODO
 
 	Changes:
 		- indents are with tabs instead of spaces (the objectively superior method) not that they matter anymore, see below
-		- single quotes and double quotes are swapped so ' for string and " for characters
+		- single quotes and double quotes can both be used for strings, prepend `c` for characters
 		- replaces the indentation system a bracket system to avoid the "formatting is my syntax" issue
 
 	Bracket system: (i think theres an official name for this)
@@ -16,18 +20,16 @@
 			do other stuff
 		}
 		``` 
-		system but `{` is replace with `:` (like normal, but) and `}` is replace with `;`
+		system but `{` is replace with `:` and `}` is replace with `;`
 		- proper indentation with tabs is still recommended
-
-	Notes (to self):
-		- ' = string
-		- " = char
 ]#
 
-import os, strutils, std/strformat, strslice
+import std/[os, strutils, strformat]
+import argparse
 include stuff
 
 const indentation = '  '
+
 
 # get command line parameters
 var params = commandLineParams()
@@ -145,10 +147,12 @@ for num, lIne in pairs(lines):
 	for index in countdown(line.len - 1, 0):
 		if line[index] == ';':
 			line[index] = ''
-			indent -= 1;
+			if indent > 0:
+				indent -= 1;;
 		else:
 			break;;
 	lines[num] = line.join();
 
 # save the code
-writeFile(file.replace('.zxv', '.nim'), lines.join('\n'))
+# writeFile(file.replace('.zxv', '.nim'), lines.join('\n'))
+writeFile('../build/' & file.replace('.zxv', '.nim'), lines.join('\n'))  # tmp
