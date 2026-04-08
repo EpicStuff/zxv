@@ -7,9 +7,9 @@ I only recently stumbled across Nim and was like lets give this a try, only to f
 ## Changes:
 - indents are with tabs instead of spaces (the objectively superior method) not that they matter anymore, see below
 - replaces the indentation system a bracket system to avoid the "formatting is my syntax" issue that python has
-- single quotes and double quotes are swapped so ' for string and " for characters
+- single quotes and double quotes can both be used to indicated a string, prepend a `c` for character (like with `&`) and stuff (see details)
 
-## Bracket system: (i think theres an official name for this)
+### Bracket System: (i think theres an official name for this)
 - basically just the normal
 ```
 if stuff {
@@ -23,28 +23,50 @@ system but `{` is replace with `:` (like normal, but) and `}` is replace with `;
 ```
 if stuff:
 	do something
-	some more code;
+	some more code
+;
 else:
-	do other stuff;
+	do other stuff
+;
 ``` 
 - proper indentation with tabs is still recommended but not required
+- not super sure about this idea, might just make this optional
+
+### Quotes:
+- `"this is a string"`, `'this is also a string'`, `c"a"` or `c'a'` for character 
+- theres some fancy auto escaping stuff going on for nested quotes in strings that I don't quite remember
 
 ## Usage
-1. `nim c wrapper.nim`
-2. `./wrapper [your code].zxv`, this will output `[your code].nim` which you can than compile with `nim c [your code].nim`
+- basic usage: `./zxc c|compile filename.zxv`
+- `./zxc -h|--help` for other commands
+
+## zxv Formmating Conventions
+- still under development
+- `# comment` for comments, `#code` for commented out code 
 
 ## To Do:
 - make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line (i think thats a thing in Nim)
 - add support for `##[`, `]##`, and `#?`
 - make it (default, optionaly) compile straight to binary instead of to nim
+- make it work for `type` (current workaround, add `#:` to end of line)
+- add auto semi colon feature (adds semicolons based on indentation)
+- finished Quotes section of the readme
+- warn/fail on bracket miss match
+- add f command to format zxv file to proper indentation (based on : and ;)
 
-## Future plans:
+## Future Plans:
 - add recursion so that you can import/include .zxv files
 - create/fork (vscode) linter/formatter
-	- make it suggest the snake case version instead of camelcase
+	- make it suggest the snake case version instead of camelCase
 - add fancy support for indents in multiline strings where the tabs dont end up getting "parsed" (if nim doesn't do this allready)
 - forbid indentation with spaces
 - future future plan: add support for reusing variables, unless I can find good reason why nim doesn't allow this
+- maybe add support for aligning lines using spaces (eg. 
+```
+x = a,
+	b,
+```
+)
 
 ## Stuff
 - i'd love any contributions (as long as matches my views on what the "correct" programming formmating is)
