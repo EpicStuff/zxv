@@ -27,7 +27,7 @@ type:
 ;
 
 
-proc ssplit(str: string, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', 'type:', 'var:', 'enum:', 'object:', '\\*'], verbose=false): seq[string] =
+proc ssplit(str: string, verbose=false, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', 'type:', 'var:', 'enum:', 'object:', '\\*']): seq[string] =
 	#[split a string into a list of individual words and symbols 
 		and symbol segments found in specials will be concidered as a single word
 		default specials are c'*', c"*", ''', """, #[, ]#, \*
@@ -230,14 +230,14 @@ proc tokenize(strs: seq[string], verbose=false): seq[Token] =
 	return tokens
 ;
 
-proc indent(tokens: var seq[Token], indentation = '  ', verbose=false) =
+proc indent(tokens: var seq[Token], verbose=false, indentation = '  ') =
 	if verbose: echo 'Indenting:'
 	var indent_level = 0
 	if verbose: debugEcho ''
-	for group in mitems tokens:
+	for num, group in mpairs tokens:
 		if verbose: debugEcho 'processing group: ', group.text.escape_str(), ', indent_level: ', indent_level, ', tkind: ', $group.kind
-		if group.kind == tIndent:
-			# add indentation
+		# add indentation if not blank line
+		if group.kind == tIndent and tokens[num + 1].kind != tNewline:
 			group.text = repeat(indentation, indent_level)
 		;
 		elif group.kind == tIndenter:
@@ -256,9 +256,9 @@ proc indent(tokens: var seq[Token], indentation = '  ', verbose=false) =
 		echo 'Warning: mismatched =/:'
 	;
 ;
-proc indent(tokens: seq[Token], indentation = '  ', verbose=false): seq[Token] =
+proc indent(tokens: seq[Token], verbose=false, indentation = '  '): seq[Token] =
 	var new_tokens = tokens
-	indent(new_tokens, indentation, verbose)
+	indent(new_tokens, verbose, indentation)
 	return new_tokens
 ;
 
@@ -330,34 +330,35 @@ proc untokenize(tokens: seq[Token], verbose=false): string =
 ;
 
 
-proc main(file: string, output = '') =
+proc main(file: string, output = '', verbose=false) =
 	# load code
-	var code = readFile(file)
-	# split code into words/symbol groups
-	var scode = ssplit(code)
-	#echo scode
+	var code = readFile file
+
+	# process code
+	var scode = code.ssplit verbose
 	# if code doesn't have trailing newline, add one
 	if scode.len != 0 and scode[^1] != '\n':
-		scode.add('\n')
+		scode.add '\n'
 	;
 	# tokenize code
-	let tokens = tokenize(scode)
-	#echo tokens
+	let tokens = scode.tokenize verbose
 	# indent code
-	let indented = indent(tokens)
-	#echo indented
+	let indented = tokens.indent verbose
 	# transform strings
-	let transformed = transform_string(indented)
-	#echo transformed
+	let transformed = indented.transform_string verbose
 	# untokenize code
-	code = untokenize(transformed)
-	#echo code.replace('\t', '\\t')
+	code = transformed.untokenize verbose
+
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
 	if output == '':
-		writeFile(file.replace('.zxv', '.nim'), code)
+		writeFile file.replace('.zxv', '.nim'), code
+	;
+	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
+		createDir output
+		writeFile output / file.split('/')[^1].split('\\')[^1].replace('.zxv', '.nim'), code
 	;
 	else:
-		writeFile(output, code)
+		writeFile output, code
 	;
 ;
 
@@ -372,14 +373,13 @@ proc run*(input: string, output = '', tmp_folder='', verbose=false) =
 	echo 'run, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
 ;
 proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) = 
-	echo 'convert, ' & input & ', ' & output & ', ' & format & ', ' & tmp_folder & ', ' & $verbose
-	main(input, output)
+	main input, output, verbose
 ;
 
 
 when isMainModule:
 	echo 'Starting:'
-	main('tests/test.zxv')
+	main 'tests/test.zxv'
 ;
 
 # ToDo:
