@@ -25,6 +25,14 @@ type:
 		kind: TokenKind
 	;
 ;
+# token "methods"
+proc next(tokens: seq[Token], index: int): Token =
+	var num = index + 1
+	while tokens[num].kind in [tSpace, tIndent, tEOF]:
+		num += 1
+	;
+	return tokens[num]
+;
 
 
 proc ssplit(str: string, verbose=false, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', 'type:', 'var:', 'enum:', 'object:', '\\*']): seq[string] =
@@ -212,16 +220,11 @@ proc tokenize(strs: seq[string], verbose=false): seq[Token] =
 	;
 
 	# deal with special tokens
-	for num1, token in mpairs tokens:
-		var num2 = num1
+	for num, token in mpairs tokens:
 		# : or = followed by comment or newline should be an indenter
 		if token.kind == tSpecial and token.text in [':', '=']:
-			# "ignore"/skip spaces
-			while tokens[num2 + 1].kind == tSpace:
-				num2 += 1
-			;
 			# then check if next token is comment or newline, no need to worry about index error since ends with tEOF
-			if tokens[num2 + 1].kind in [tComment, tNewline, tEOF]:
+			if tokens.next(num).kind in [tComment, tNewline, tEOF]:
 				token.kind = tIndenter
 			;
 		;
@@ -258,7 +261,7 @@ proc indent(tokens: var seq[Token], verbose=false, indentation = '  ') =
 ;
 proc indent(tokens: seq[Token], verbose=false, indentation = '  '): seq[Token] =
 	var new_tokens = tokens
-	indent(new_tokens, verbose, indentation)
+	indent new_tokens, verbose, indentation
 	return new_tokens
 ;
 
@@ -314,7 +317,108 @@ proc transform_string(tokens: var seq[Token], verbose=false) =
 ;
 proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 	var new_tokens = tokens
-	transform_string(new_tokens, verbose)
+	transform_string new_tokens, verbose
+	return new_tokens
+;
+
+proc stuff(tokens: var seq[Token], verbose=false) =
+	# bunch of misc. post processing
+	proc handle_imports(tokens: var seq[Token]) =
+		# runs convert on imported/included files
+		var imports: seq[string]
+		var status = 0  # 0 = not importing, 1 = in import, 2 = in module, 3 = in [...], 4 = in module in [...], 10 = potential std/pkg/
+		var module = ''
+		var tmp = ''
+
+		for num, token in mpairs tokens:
+			# check if starting import
+			if token.kind == tOther and token.text in ['import', 'include', 'from']:
+				echo 'Handling import/include: status - ', status
+				status = 1
+				continue
+			;
+			if status in {1, 3}:
+				# skip separators
+				if token.kind in [tSpace, tIndent, tNewline]:
+					continue
+				;
+				# if string paths, stop import
+				if token.kind == tString:
+					echo '\tstring path: ', token.text, ', status ', status
+					status = 0
+					continue
+				;
+				# check for std/pkg
+				elif token.text in ['std', 'pkg']:
+					echo '\tpotential std/pkg import: ', token.text, ', status: ', status
+					status = 10
+					continue
+				;
+			;
+			# if in module and encounter separator
+			if status in {2, 4} and token.text in [' ', ',', '\n', ']']:
+				# append tmp if in [...]
+				if status == 4:
+					module = tmp & module
+				;
+
+				echo '\tadding module: ', module, ', status: ', status
+				imports.add module
+				module = ''
+
+				# if in [...]
+				if status == 4:
+					# if closing ], exit to in import
+					if token.text == ']':
+						status = 1
+					;
+					# else, stay in [...]
+					else:
+						status = 3
+					;
+				;
+				# else if \n, exit import, else stay in import
+				elif token.text == '\n':
+					status = 0
+				;
+				else:
+					status = 1
+				;
+			;
+			elif status in {1, 2, 3, 4}:
+				if token.text == '[':
+					status = 3
+					tmp = module  # save first part of module
+					module = ''
+					continue
+				;
+				# change status to in module (if not in module)
+				if status in {1, 3}:
+					status += 1
+				;
+				module.add token.text
+				echo '\tmodule: ', tmp & module, ', status: ', status
+			;
+			# skip std/... and pkg/... (stop import)
+			elif status == 10:
+				if token.text == '/':
+					echo '\tconfirmed std/pkg import: skipping', ', status: ', status
+					status = 0
+				;
+				else:
+					raise Exception.newException 'Unexpected token while handling imports: ' & token.text
+				;
+			;
+		;
+		echo '\n'
+		echo imports
+	;
+
+	handle_imports tokens
+;
+proc stuff(tokens: seq[Token], verbose=false): seq[Token] =
+	var new_tokens = tokens
+	stuff new_tokens, verbose
 	return new_tokens
 ;
 
@@ -340,14 +444,8 @@ proc main(file: string, output = '', verbose=false) =
 	if scode.len != 0 and scode[^1] != '\n':
 		scode.add '\n'
 	;
-	# tokenize code
-	let tokens = scode.tokenize verbose
-	# indent code
-	let indented = tokens.indent verbose
-	# transform strings
-	let transformed = indented.transform_string verbose
-	# untokenize code
-	code = transformed.untokenize verbose
+
+	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose).untokenize(verbose)
 
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
 	if output == '':
@@ -363,16 +461,17 @@ proc main(file: string, output = '', verbose=false) =
 ;
 
 
-proc format*(input: string, output = '', verbose=false) = 
+proc format*(input: string, output = '', verbose=false) =
 	echo 'format, ' & input & ', ' & output & ', ' & $verbose
 ;
-proc compile*(input: string, output = '', tmp_folder='', verbose=false) = 
+proc compile*(input: string, output = '', tmp_folder='', verbose=false) =
 	echo 'compile, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
 ;
-proc run*(input: string, output = '', tmp_folder='', verbose=false) = 
+proc run*(input: string, output = '', tmp_folder='', verbose=false) =
 	echo 'run, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
 ;
-proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) = 
+proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) =
+	echo 'Converting: ', input
 	main input, output, verbose
 ;
 
