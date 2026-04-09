@@ -1,4 +1,4 @@
-import std/[os, strutils, strformat, re]
+import std/[os, strutils, strformat, re, sequtils]
 import utils
 
 
@@ -26,14 +26,20 @@ type:
 	;
 ;
 # token "methods"
-proc next(tokens: seq[Token], index: int): Token =
+proc next(tokens: seq[Token], index: int, ignore = [tSpace, tIndent, tEOF]): Token =
 	var num = index + 1
-	while tokens[num].kind in [tSpace, tIndent, tEOF]:
+	while tokens[num].kind in ignore:
 		num += 1
 	;
 	return tokens[num]
 ;
-
+proc prev(tokens: seq[Token], index: int, ignore = [tSpace, tComment]): Token =
+	var num = index - 1
+	while tokens[num].kind in ignore:
+		num -= 1
+	;
+	return tokens[num]
+;
 
 proc ssplit(str: string, verbose=false, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', 'type:', 'var:', 'enum:', 'object:', '\\*']): seq[string] =
 	#[split a string into a list of individual words and symbols 
@@ -324,94 +330,49 @@ proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 proc stuff(tokens: var seq[Token], verbose=false) =
 	# bunch of misc. post processing
 	proc handle_imports(tokens: var seq[Token]) =
-		# runs convert on imported/included files
+		#[runs convert on imported/included files]#
+		# join import "lines" together into single string
 		var imports: seq[string]
-		var status = 0  # 0 = not importing, 1 = in import, 2 = in module, 3 = in [...], 4 = in module in [...], 10 = potential std/pkg/
-		var module = ''
-		var tmp = ''
-
+		var start = -1
+		var stop = -1
 		for num, token in mpairs tokens:
-			# check if starting import
 			if token.kind == tOther and token.text in ['import', 'include', 'from']:
-				echo 'Handling import/include: status - ', status
-				status = 1
+				echo 'Start: ', num, ', token: ', token.text
+				start = num
+			;
+			if start != -1 and token.kind == tNewline and not (tokens.prev(num).text in [',', 'import', 'include', 'from']):
+				echo '\tStop: ', num, ', token: ', tokens.prev(num).text
+				stop = num
+			;
+			if start != -1 and stop != -1:
+				imports.add tokens[start + 1..stop].filter_it(it.kind != tComment).map_it(it.text.strip()).join('')
+				echo '\tJoining: ', start, ' to ', stop, ', tokens: ', imports[^1]
+				start = -1
+				stop = -1
+			;
+		;
+		echo imports
+
+		# split each import line by `,`, while dealing with [...]
+		var modules: seq[string]
+		for imp in imports:
+			if imp.startsWith("std/") or imp.startsWith("pkg/"):
 				continue
 			;
-			if status in {1, 3}:
-				# skip separators
-				if token.kind in [tSpace, tIndent, tNewline]:
-					continue
-				;
-				# if string paths, stop import
-				if token.kind == tString:
-					echo '\tstring path: ', token.text, ', status ', status
-					status = 0
-					continue
-				;
-				# check for std/pkg
-				elif token.text in ['std', 'pkg']:
-					echo '\tpotential std/pkg import: ', token.text, ', status: ', status
-					status = 10
-					continue
+			if '[' in imp:
+				let base = imp.split('[')[0]
+				let mods = imp.split('[')[1].split(',')
+				for modu in mods:
+					modules.add base & modu.strip()
 				;
 			;
-			# if in module and encounter separator
-			if status in {2, 4} and token.text in [' ', ',', '\n', ']']:
-				# append tmp if in [...]
-				if status == 4:
-					module = tmp & module
-				;
-
-				echo '\tadding module: ', module, ', status: ', status
-				imports.add module
-				module = ''
-
-				# if in [...]
-				if status == 4:
-					# if closing ], exit to in import
-					if token.text == ']':
-						status = 1
-					;
-					# else, stay in [...]
-					else:
-						status = 3
-					;
-				;
-				# else if \n, exit import, else stay in import
-				elif token.text == '\n':
-					status = 0
-				;
-				else:
-					status = 1
-				;
-			;
-			elif status in {1, 2, 3, 4}:
-				if token.text == '[':
-					status = 3
-					tmp = module  # save first part of module
-					module = ''
-					continue
-				;
-				# change status to in module (if not in module)
-				if status in {1, 3}:
-					status += 1
-				;
-				module.add token.text
-				echo '\tmodule: ', tmp & module, ', status: ', status
-			;
-			# skip std/... and pkg/... (stop import)
-			elif status == 10:
-				if token.text == '/':
-					echo '\tconfirmed std/pkg import: skipping', ', status: ', status
-					status = 0
-				;
-				else:
-					raise Exception.newException 'Unexpected token while handling imports: ' & token.text
+			else:
+				for modu in imp.split(','):
+					modules.add modu.strip()
 				;
 			;
 		;
-		echo '\n'
-		echo imports
+		echo modules
 	;
 
 	handle_imports tokens

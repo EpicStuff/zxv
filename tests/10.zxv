@@ -1,0 +1,7 @@
+import std/[os, strutils]
+import utils1, utils2,  # this is a comment
+	utils3
+import  # this is a comment
+	utils4
+include test/testing/[a, b, c]
+from utils5 import stuff
