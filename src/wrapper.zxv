@@ -24,24 +24,91 @@
 		- proper indentation with tabs is still recommended
 ]#
 
-import std/[os, strutils, strformat]
+import std/[os, strutils, strformat, osproc]
 import argparse
-include stuff
 
 const indentation = '  '
-const debug = true
+
+
+proc ssplit(str: string, specials = ['\\*', '"""', '\'\'\'', '#[', ']#', '\\\'']): seq[string] =
+	## split a string into a list of individual letters as strings 
+	## and string segment found in special will be concidered as a single "letter"
+	## default specials are ''', """, "\"", #[, ]#, \'
+	var line: seq[string]
+	var skip = 0
+	# for each char in string
+	for index, char in pairs(str):
+		block a:
+			#debugEcho index, 'st char, ', char, ', skip: ', skip
+			if skip > 0:
+				skip -= 1
+				continue
+			;
+			# compare each char to each special
+			for special in specials:
+				block b:
+					#debugEcho '\tchecking: \'', special, '\''
+					try:
+						# take the first char in special
+						for num, spe in special:
+							#debugEcho '\t\tmatching: ', spe
+							# if special is a star, auto match
+							if spe == "*":
+								continue
+							;
+							# if they dont match, move on to the next special
+							if spe != str[index + num]:
+								break b
+							;
+						;
+						# if match
+						#debugEcho '\tmatch'
+						var len = special.len - 1
+						line.add(str[index..index+len])
+						skip += len
+						break a
+					;
+					except IndexDefect:
+						discard
+					;
+				;
+			;
+			#debugEcho '\tno match'
+			line.add($char)
+		;
+	;
+	return line
+;
+
 
 
 # get command line parameters
 var params = commandLineParams()
 
-# loop through command line parameters for first argument that doesn't start with `-`
+# loop through command line parameters
 var file: string
+var verbose = false
+var compile = false
+
 for num, param in params:
-	if param[0] != "-":
-		file = param
-		params.delete(num)
-		break;;
+	if param == '-v' or param == '--verbose':
+		verbose = true
+	;
+	elif param == '-c' or param == '--compile':
+		compile = true
+	;
+	elif param[0] != "-":
+		if file.len == 0:
+			file = param
+		;
+	;
+;
+
+# chech for input file
+if file.len == 0:
+	echo 'no input file specified'
+	quit 1
+;
 
 # load the code
 var code = readFile(file)
@@ -52,56 +119,62 @@ while true:
 	code = code.replace(' \n', '\n')
 	code = code.replace('\t\n', '\n')
 	if code == old_code:
-		break;
-	old_code = code;
+		break
+	;
+	old_code = code
+;
 
 # deal with indentation
 var indent = 0
 var comment = 0
 var in_char = false
-var in_str = 0
+var in_str = 0  # 0 = not in string, 1 = in string, 2 = 1st line of multiline string, 3 = in multiline string, 4 = end of multiline string
 
 var lines = splitLines(code)
 for num, lIne in pairs(lines):
 	# split string into list of 1 long strings, unless escape character
 	var line = ssplit(lIne)
-	debugEcho 'checking line: ', num, ', ', line
+	if verbose: debugEcho 'checking line: ', num, ', ', line
 	# skip empty lines
 	if line == @[]:
-		continue;
+		continue
+	;
 	## deal with comments
 	# debugEcho ', line starts with: ', line[0], ', comment: ', comment
 	# check if is start of multiline comment (if line, ignoring indentation starts with #[)
 	if line[0] == '#[':
-		comment += 1;
+		comment += 1
+	;
 	# check if is end of multiline comment
 	if line[^1] == ']#' and comment > 0:
-		comment -= 1;
+		comment -= 1
+	;
 	# if is in a comment block or is a normal line comment, skip
 	if comment > 0 or line[0] == '#':
         lines[num] = lines[num].replace('\t', indentation)
-		continue;
-
-	## deal with multiline strings
-	# to do
+		continue
+	;
 
 	## if not in a comment/string block
 	# go character by character
 	for index, char_group in pairs(line):
-		debugEcho '\tchecking ', index, 'th char group: ', char_group, '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
+		if verbose: debugEcho '\tchecking ', index, 'th char group: ', char_group.replace '\t', '\\t', '\t\t\t', 'indent: ', indent, ',\tcomment: ', comment, ',\tin char: ', in_char, ',\tin str: ', in_str
 		
 		## swap quotes
 		# dealing with characters
 		if in_char:
 			if char_group == '\'':
-				line[index] = '\\\'';
+				line[index] = '\\\''
+			;
 			in_char = false
-			continue;
+			continue
+		;
 		# if not in a string/char and encounter `"`
 		if in_str == 0:
 			# deal with inline comments, skip rest of line
 			if char_group == '#':
-				break;
+				break
+			;
 			if char_group == '"':
 				block a:
 					# if is "\"" or """
@@ -109,66 +182,89 @@ for num, lIne in pairs(lines):
 						if char_group == '"\\""' or char_group == '"""':
 							# replace with '\''
 							line[index] = '\'\\\'\''
-							break a;;
+							break a
+						;
+					;
 					except IndexDefect:
-						discard;
+						discard
+					;
 					# elif is ""
 					try:
 						if char_group == '""':
-							raise newException(ValueError, fmt'empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}');;
+							raise newException(ValueError, fmt'empty char detected (and is not allowed), line: {num + 1}, char: {index + 1}')
+						;
+					;
 					except IndexDefect:
-						discard;
+						discard
+					;
 					# else, replace " with '
 					line[index] = '\''
-					in_char = true;;
-		# dealing with strings
-			# if not in string and encounter ', replace with " and enter string
+					in_char = true
+				;
+			;
+			# dealing with strings
 			if char_group == '\'':
-				debugEcho '\t\treplacing char group with "'
+				if verbose: debugEcho '\t\treplacing char group with "'
 				line[index] = '"'
-				in_str = 1;
+				in_str = 1
+			;
 			# tmp multiline string support
 			elif char_group == '\'\'\'':
-				debugEcho '\t\treplacing char group with """'
+				if verbose: debugEcho '\t\treplacing char group with """'
 				line[index] = '"""'
-				in_str = 2;;
+				in_str = 2
+			;
+		;
 		elif in_str == 1:
 			# if " in string, escape it
 			if char_group == '"':
-				debugEcho '\t\treplacing char group with \\"'
-				line[index] = '\\"';
+				if verbose: debugEcho '\t\treplacing char group with \\"'
+				line[index] = '\\"'
+			;
 			# if """ in string, escape it (\"\"\")
 			elif char_group == '"""':
-				line[index] = '\\"\\"\\"';
+				line[index] = '\\"\\"\\"'
+			;
 			# if "\"" in string, escape it (\"\\\"\")
 			elif char_group == '"\\""':
-				line[index] = '\\"\\\\\\"\\"';
+				line[index] = '\\"\\\\\\"\\"'
+			;
 			# if \' in string, remove unesseary escape
 			elif char_group == '\\\'':
-				debugEcho '\t\treplacing char group with \''
-				line[index] = '\'';
+				if verbose: debugEcho '\t\treplacing char group with \''
+				line[index] = '\''
+			;
 
 			# if ' in a string and is not escaped, swap and escape it, and exit string
 			if char_group == '\'':
 				line[index] = '"'
-				in_str = 0;;
-		# tmp multiline string support, in_str == 2
+				in_str = 0
+			;
+		;
+		# tmp multiline string support, in_str == 2 or 3
 		else:
 			if char_group == '\'\'\'':
 				line[index] = '"""'
-				in_str = 0;
+				in_str = 4
+			;
 			else:
-				continue;;;
+				continue
+			;
+		;
+	;
 
 	## deal with indentation
-	debugEcho ''
-	if in_str != 2:
+	if verbose: debugEcho ''
+	if in_str notin [3, 4]:
 		# remove existing indentation
 		for index, char_group in pairs(line):
 			if char_group in @[' ', '\t']:
-				line[index] = '';
+				line[index] = ''
+			;
 			else:
-				break;;
+				break
+			;
+		;
 		# add indentation
 		line[0] = repeat(indentation, indent) & line[0]
 		# check for dedentation
@@ -176,19 +272,47 @@ for num, lIne in pairs(lines):
 			indent += 1;
 		for index in countdown(line.len - 1, 0):
 			if line[index] == '':
-				debugEcho ', break'
-				break;
-			stdout.write '\tchecking index: ', index, ', char: ', line[index][^1]
+				if verbose: debugEcho ', break'
+				break
+			;
+			if verbose: stdout.write '\tchecking index: ', index, ', char: ', line[index][^1]
 			if line[index][^1] == ";":
 				line[index] = ''
 				if indent > 0:
-					indent -= 1;
-				debugEcho ', dedenting, indent: ', indent;
+					indent -= 1
+				;
+				if verbose: debugEcho ', dedenting, indent: ', indent
+			;
 			else:
-				debugEcho ', break'
-				break;;;
-	lines[num] = line.join();
+				if verbose: debugEcho ', break'
+				break
+			;
+		;
+	;
+	lines[num] = line.join()
+	
+	# tmp multiline string support
+	if in_str == 2:
+		in_str = 3
+	;
+	elif in_str == 4:
+		in_str = 0
+	;
+;
 
 # save the code
 # writeFile(file.replace('.zxv', '.nim'), lines.join('\n'))
-writeFile('../build/' & file.replace('.zxv', '.nim'), lines.join('\n'))  # tmp
+file = file.replace('src/', 'build/').replace('.zxv', '.nim')
+echo 'saving to: ', file.split('/')[0..^2].join('/')
+try:
+	createDir file.split('/')[0..^2].join('/')
+;
+except OSError:
+	discard
+;
+echo 'saving to ', file
+writeFile file, lines.join('\n')
+
+if compile:
+	discard execShellCmd 'nim c ' & file
+;
