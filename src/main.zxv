@@ -3,6 +3,10 @@ import compiler/[options, pathutils]
 import utils
 
 
+var processed: seq[string]  # to avoid processing the same file multiple times
+
+proc main(file2: string, verbose=false, output = '')
+
 # "list" of possible token types
 type:
 	TokenKind = enum:
@@ -27,7 +31,7 @@ type:
 	;
 ;
 # token "methods"
-proc next(tokens: seq[Token], index: int, ignore = [tSpace, tIndent, tEOF]): Token =
+proc next(tokens: seq[Token], index: int, ignore = [tSpace, tIndent]): Token =
 	var num = index + 1
 	while tokens[num].kind in ignore:
 		num += 1
@@ -247,8 +251,8 @@ proc indent(tokens: var seq[Token], verbose=false, indentation = '  ') =
 	for num, group in mpairs tokens:
 		if verbose: debugEcho 'processing group: ', group.text.escape_str(), ', indent_level: ', indent_level, ', tkind: ', $group.kind
 		# add indentation if not blank line
-		if group.kind == tIndent and tokens[num + 1].kind != tNewline:
-			group.text = repeat(indentation, indent_level)
+		if group.kind == tIndent and tokens.next(num).kind notin [tSemi, tNewline]:
+			group.text = indentation.repeat(indent_level)
 		;
 		elif group.kind == tIndenter:
 			indent_level += 1
@@ -330,7 +334,7 @@ proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 
 proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) =
 	# bunch of misc. post processing
-	proc handle_imports(tokens: var seq[Token], file: string, output: string) =
+	proc handle_imports(tokens: var seq[Token]) =
 		#[runs convert on imported/included files]#
 		# join import "lines" together into single string
 		var imports: seq[string]
@@ -338,21 +342,21 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 		var stop = -1
 		for num, token in mpairs tokens:
 			if token.kind == tOther and token.text in ['import', 'include', 'from']:
-				echo 'Start: ', num, ', token: ', token.text
+				if verbose: echo 'Start: ', num, ', token: ', token.text
 				start = num
 			;
-			if start != -1 and token.kind == tNewline and not (tokens.prev(num).text in [',', 'import', 'include', 'from']):
-				echo '\tStop: ', num, ', token: ', tokens.prev(num).text
+			if start != -1 and token.kind == tNewline and tokens.prev(num).text notin [',', 'import', 'include', 'from']:
+				if verbose: echo '\tStop: ', num, ', token: ', tokens.prev(num).text
 				stop = num
 			;
 			if start != -1 and stop != -1:
 				imports.add tokens[start + 1..stop].filter_it(it.kind != tComment).map_it(it.text.strip()).join('')
-				echo '\tJoining: ', start, ' to ', stop, ', tokens: ', imports[^1]
+				if verbose: echo '\tJoining: ', start, ' to ', stop, ', tokens: ', imports[^1]
 				start = -1
 				stop = -1
 			;
 		;
-		echo imports
+		if verbose: echo imports
 
 		# split each import line by `,`, while dealing with [...]
 		var modules: seq[string]
@@ -381,24 +385,26 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 		for module in modules:
 			var full_path = $find_module(conf, module, file, 'zxv')
 			# if is a zxv file
-			if full_path != '':
-				echo '#### Converting: ', full_path, ' ####'
+			if full_path != '' and full_path notin processed:
+				echo '######## Converting: ', full_path,' (output: ', output, ') ########'
+				processed.add full_path
 				main full_path, verbose, output
 			;
 			# if is a nim file and output is specified, copy to output
 			elif output != '':
-
-
 				full_path = $find_module(conf, module, file)
-				if full_path != '':
-					echo 'Copying: ', full_path, ' to ', output / module
-					# copyFile full_path, output / module
+				if full_path != '' and full_path notin processed:
+					echo 'Copying: ', full_path, ' to ', output / module.add_file_ext 'nim'
+					processed.add full_path
+					copy_file full_path, output / module.add_file_ext 'nim'
 				;
 			;
 		;
 	;
 
-	handle_imports tokens, file, output
+	#proc allow_comments()
+
+	tokens.handle_imports()
 ;
 proc stuff(tokens: seq[Token], verbose=false, file: string, output: string): seq[Token] =
 	var new_tokens = tokens
@@ -417,17 +423,62 @@ proc untokenize(tokens: seq[Token], verbose=false): string =
 	return result
 ;
 
-
-proc main(file: string, verbose=false, output = '') =
-	# process output path
-	if output == '':
-		let output_folder = file
+proc more_stuff(code: var string, verbose=false) =
+	#[misc. post processing done after untokenizing]#
+	proc strip_trailing_spaces(code: var string) =
+		var old_code = code
+		while true:
+			code = code.replace(' \n', '\n')
+			code = code.replace('\t\n', '\n')
+			if code == old_code:
+				break
+			;
+			old_code = code
+		;
 	;
-	# if its a folder, if not exist and not ends with /, assume its file
-	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
-		createDir output
 
-	
+	#code.strip_trailing_spaces()
+;
+proc more_stuff(code: string, verbose=false): string =
+	#[misc. post processing done after untokenizing]#
+	var new_code = code
+	more_stuff new_code, verbose
+	return new_code
+;
+
+proc main(file2: string, verbose=false, output = '') =
+	var file = file2
+	var output_folder: string
+	var out_file: string
+	# process paths
+	# # get output folder and file
+	# ## if output not specified, save to ... .nim
+	if output == '':
+		output_folder = file.parent_dir()
+		out_file = file.extract_filename().change_file_ext '.nim'
+	;
+	# ## if its a folder, (if not exist and not ends with /, assume its file)
+	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
+		output_folder = output
+		out_file = file.extract_filename().change_file_ext '.nim'
+		createDir output_folder
+	;
+	# ## else, output is a file
+	else:
+		output_folder = output.parent_dir()
+		out_file = output.extract_filename()
+		createDir output_folder
+	;
+	# # allow user to omit file extension
+	if file.split_file.ext == '' and not file.file_exists:
+		file = file.add_file_ext 'zxv'
+		out_file = out_file.add_file_ext 'nim'
+	;
+	# # add / when appropriate
+	if not output_folder.ends_with '/':
+		output_folder.add '/'
+	;
+
 	# load code
 	var code = readFile file
 
@@ -438,19 +489,11 @@ proc main(file: string, verbose=false, output = '') =
 		scode.add '\n'
 	;
 
-	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose, file, output).untokenize(verbose)
+	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose, file, output_folder).untokenize(verbose).more_stuff(verbose)
 
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
-	if output == '':
-		writeFile file.replace('.zxv', '.nim'), code
-	;
-	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
-		createDir output
-		writeFile output / file.split('/')[^1].split('\\')[^1].replace('.zxv', '.nim'), code
-	;
-	else:
-		writeFile output, code
-	;
+	echo 'Saving ', file, ' to ', output_folder / out_file
+	writeFile output_folder / out_file, code
 ;
 
 
@@ -475,9 +518,10 @@ when isMainModule:
 ;
 
 # ToDo:
+	# - for import, add support for copying nim files that are imported by other nim files to output
+	# - for import, support string imports
+	# - implement compile and run
 	# - auto convert ## to # or : : (documentation comments)
 	# - add support for fmt (code inside strings)
 		# - make sure that r'string' works
-	# - add support for include/import
-	# - remove trailing spaces
 	# - maybe add support for #:

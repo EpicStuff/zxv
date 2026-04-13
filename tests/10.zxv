@@ -4,6 +4,8 @@ import utils1, utils2,  # this is a comment
 import  # this is a comment
 	utils4
 include test/testing/[a, b, c]
+import test/[a,
+	b]
 from utils5 import stuff
 
 import '~/test.zxv'
