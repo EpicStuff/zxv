@@ -1,4 +1,5 @@
 import std/[os, strutils, strformat, re, sequtils]
+import compiler/[options, pathutils]
 import utils
 
 
@@ -327,9 +328,9 @@ proc transform_string(tokens: seq[Token], verbose=false): seq[Token] =
 	return new_tokens
 ;
 
-proc stuff(tokens: var seq[Token], verbose=false) =
+proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) =
 	# bunch of misc. post processing
-	proc handle_imports(tokens: var seq[Token]) =
+	proc handle_imports(tokens: var seq[Token], file: string, output: string) =
 		#[runs convert on imported/included files]#
 		# join import "lines" together into single string
 		var imports: seq[string]
@@ -361,7 +362,7 @@ proc stuff(tokens: var seq[Token], verbose=false) =
 			;
 			if '[' in imp:
 				let base = imp.split('[')[0]
-				let mods = imp.split('[')[1].split(',')
+				let mods = imp.split('[')[1].strip(false, chars = {c']'}).split(',')
 				for modu in mods:
 					modules.add base & modu.strip()
 				;
@@ -373,13 +374,35 @@ proc stuff(tokens: var seq[Token], verbose=false) =
 			;
 		;
 		echo modules
+
+		# resolve the module paths
+		var conf = newConfigRef()
+		conf.setDefaultLibpath()
+		for module in modules:
+			var full_path = $find_module(conf, module, file, 'zxv')
+			# if is a zxv file
+			if full_path != '':
+				echo '#### Converting: ', full_path, ' ####'
+				main full_path, verbose, output
+			;
+			# if is a nim file and output is specified, copy to output
+			elif output != '':
+
+
+				full_path = $find_module(conf, module, file)
+				if full_path != '':
+					echo 'Copying: ', full_path, ' to ', output / module
+					# copyFile full_path, output / module
+				;
+			;
+		;
 	;
 
-	handle_imports tokens
+	handle_imports tokens, file, output
 ;
-proc stuff(tokens: seq[Token], verbose=false): seq[Token] =
+proc stuff(tokens: seq[Token], verbose=false, file: string, output: string): seq[Token] =
 	var new_tokens = tokens
-	stuff new_tokens, verbose
+	stuff new_tokens, verbose, file, output
 	return new_tokens
 ;
 
@@ -395,7 +418,16 @@ proc untokenize(tokens: seq[Token], verbose=false): string =
 ;
 
 
-proc main(file: string, output = '', verbose=false) =
+proc main(file: string, verbose=false, output = '') =
+	# process output path
+	if output == '':
+		let output_folder = file
+	;
+	# if its a folder, if not exist and not ends with /, assume its file
+	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
+		createDir output
+
+	
 	# load code
 	var code = readFile file
 
@@ -406,7 +438,7 @@ proc main(file: string, output = '', verbose=false) =
 		scode.add '\n'
 	;
 
-	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose).untokenize(verbose)
+	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose, file, output).untokenize(verbose)
 
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
 	if output == '':
@@ -433,7 +465,7 @@ proc run*(input: string, output = '', tmp_folder='', verbose=false) =
 ;
 proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) =
 	echo 'Converting: ', input
-	main input, output, verbose
+	main input, verbose, output
 ;
 
 

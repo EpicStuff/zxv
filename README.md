@@ -52,7 +52,18 @@ Download the latest binary and use that to "compile" all the `.zxv` files
 
 ### The Hard Way
 
-
+1. `git checkout v1.0.2`
+	- `cp wrapper.zxc wrapper.nim` and `cp stuff.zxc stuff.nim`
+	- a) get rid of all `;` except for the one on wrapper line 146 (regex: `(?<!');` -> ``)
+	- b) replace all tabs with 2 spaces (regex: `\t` -> `  `)
+	- c) replace all `"` with `\"` (regex: `"` -> `\"`)
+	- d) replace all not escaped `'` with " (regex: `(?<!\\)'` -> `"`)
+	- e) replace `\"=\"` -> `'-'` (wrapper line 38) and `\"*\"` -> `'*'` (stuff line 25) (not regex)
+	- f) fix indentation on line 79 (dedent twice)
+	- `nim c wrapper`
+2. `git checkout v1.0.3`, `./wrapper src/stuff.zxv && ./wrapper src/wrapper.zxv`, `nim c src/wrapper`
+3. `git checkout v1.0.4`, `mkdir build/`, `cd src/`, `./wrapper wrapper.zxv`, `cd ..`, `nim c build/wrapper`
+4. `git checkout v1.1.0`, `./build/wrapper src/utils.zxv && ./build/wrapper src/main.zxv && ./build/wrapper src/zdocopt.zxv -c`
 
 ## To Do:
 - make it so that `.` (or another symbol) gets replaced by `;` so you can do multiple statements on the same line (i think thats a thing in Nim)

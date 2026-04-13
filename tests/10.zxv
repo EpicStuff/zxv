@@ -5,3 +5,6 @@ import  # this is a comment
 	utils4
 include test/testing/[a, b, c]
 from utils5 import stuff
+
+import '~/test.zxv'
+import '~/test.nim'
