@@ -136,7 +136,7 @@ Arguments after -- are passed onto nim.
 	'''#.replace('\t', '  ').dedent().strip(false)
 
 	let args = docopt doc
-	convert $args['<input>'], $args['--output'], $args['--format'], $args['--tmp_folder'], args['--verbose']
+	discard convert($args['<input>'], $args['--output'], $args['--format'], $args['--tmp_folder'], args['--verbose'])
 ;
 
 

@@ -1,5 +1,159 @@
-import std/strutils
+import std/[strutils, macros]
+
+
+proc `+`*(a: string, b: string): string =
+	return a & b
+;
 
 proc escape_str*(str: string): string =
 	return str.replace('\t', '\\t').replace('\n', '\\n').replace(' ', '\\s')
+;
+
+
+
+import macros
+
+proc expand_non_inplace(def: NimNode, arg_names: seq[string]): NimNode =
+	result = newStmtList()
+	let nodes = if def.kind == nnkStmtList: def else: newStmtList(def)
+	for node in nodes:
+		let p = if node.kind == nnkStmtList and node.len == 1: node[0] else: node
+		if p.kind != nnkProcDef: error('add_non_inplace_overload expects a proc definition', node)
+		let params = p[3]
+		if params.kind != nnkFormalParams or params.len < 2: error('invalid proc parameter structure', p)
+		let names = if arg_names.len == 0: @[$params[1][0]] else: arg_names
+		result.add p
+		for arg_name in names:
+			var pos = -1
+			for i in 1 ..< params.len:
+				let param = params[i]
+				if param.kind != nnkIdentDefs: continue
+				for j in 0 ..< param.len - 2:
+					if $param[j] == arg_name: pos = i
+				;
+				if pos != -1: break
+			;
+			if pos == -1: error('no parameter named ' & arg_name, params)
+			let param = params[pos]
+			if param.len != 3 or param[1].kind != nnkVarTy: error('selected parameter must be a simple var T', param)
+			let temp = genSym(nskVar, 'new_' & $param[0])
+			var q = copyNimTree(p)
+			q[3][0] = copyNimTree(param[1][0])
+			q[3][pos][1] = copyNimTree(param[1][0])
+			var call = newCall(copyNimTree(p[0]))
+			for i in 1 ..< params.len:
+				if params[i].kind != nnkIdentDefs or params[i].len != 3: error('grouped parameters are not supported', params[i])
+				call.add(if i == pos: temp else: copyNimTree(params[i][0]))
+			;
+			q[6] = newStmtList(newVarStmt(temp, copyNimTree(param[0])), call, newTree(nnkReturnStmt, temp))
+			result.add q
+		;
+	;
+;
+
+macro add_non_inplace_overload*(def: untyped): untyped =
+	expand_non_inplace(def, @[])
+;
+
+macro add_non_inplace_overload*(args: untyped, def: untyped): untyped =
+	var names: seq[string]
+	case args.kind
+	of nnkStrLit: names = @[args.strVal]
+	of nnkBracket:
+		for x in args:
+			if x.kind != nnkStrLit: error('args entries must be string literals', x)
+			names.add x.strVal
+		;
+	else: error('args must be a string or bracket list of strings', args)
+	;
+	expand_non_inplace(def, names)
+;
+
+
+
+
+
+macro overload*(args: untyped, def: untyped): untyped =
+	var var_args: seq[string]
+
+	case args.kind
+	of nnkStrLit: var_args = @[args.strVal]
+	of nnkBracket:
+		for arg in args:
+			if arg.kind != nnkStrLit: error 'args entries must be string literals', arg
+			var_args.add arg.strVal
+		;
+	else: error 'args must be a string or a list of strings', args
+	;
+
+
+
+	let proc_def =
+		if def.kind != nnkStmtList: [def]
+		else: def
+	;
+
+	for node in proc_def:
+
+	if node.kind != nnkProcDef:
+		error('overload expects a proc definition', def)
+	;
+
+	let name = node[0]
+	let params = node[3]
+
+	if params.kind != nnkFormalParams:
+		error('unexpected proc parameter structure', proc_def)
+	;
+	if params.len < 2:
+		error('proc must have at least one parameter', proc_def)
+	;
+
+	let first_param = orig_params[1]
+	if first_param.kind != nnkIdentDefs:
+		error('unexpected first parameter structure', first_param)
+	;
+
+	let first_name = first_param[0]
+	let first_type = first_param[1]
+
+	if first_type.kind != nnkVarTy:
+		error('first parameter must be var T', first_param)
+	;
+
+	let inner_type = first_type[0]
+	let temp_name = genSym(nskVar, 'new_' & $first_name)
+
+	var new_def = copyNimTree(proc_def)
+	var new_params = new_def[3]
+
+	new_params[0] = copyNimTree(inner_type)
+	new_params[1][1] = copyNimTree(inner_type)
+
+	var call_node = newCall(copyNimTree(orig_name))
+	call_node.add(temp_name)
+
+	for i in 2 ..< orig_params.len:
+		let param = orig_params[i]
+		if param.kind != nnkIdentDefs:
+			error('unexpected parameter structure', param)
+		;
+		for j in 0 ..< param.len - 2:
+			call_node.add(copyNimTree(param[j]))
+		;
+	;
+
+	new_def[6] = newStmtList(
+		newVarStmt(temp_name, copyNimTree(first_name)),
+		call_node,
+		newTree(nnkReturnStmt, temp_name)
+	)
+
+	result = newStmtList(proc_def, new_def)
+
+	echo '===== generated ====='
+	echo result.repr
+;
+macro overload*(def: untyped): untyped =
+	overload @[], def
 ;

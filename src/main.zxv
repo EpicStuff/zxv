@@ -1,11 +1,11 @@
-import std/[os, strutils, strformat, re, sequtils]
+import std/[os, strutils, strformat, re, sequtils, osproc, tempfiles]
 import compiler/[options, pathutils]
 import utils
 
 
 var processed: seq[string]  # to avoid processing the same file multiple times
 
-proc main(file2: string, verbose=false, output = '')
+proc main(file2: string, verbose=false, output = ''): string
 
 # "list" of possible token types
 type:
@@ -46,6 +46,7 @@ proc prev(tokens: seq[Token], index: int, ignore = [tSpace, tComment]): Token =
 	return tokens[num]
 ;
 
+# zxv to nim functions/steps
 proc ssplit(str: string, verbose=false, specials = ['c\'*\'', 'c"*"', '\'\'\'', '"""', '#[', ']#', 'type:', 'var:', 'enum:', 'object:', '\\*']): seq[string] =
 	#[split a string into a list of individual words and symbols 
 		and symbol segments found in specials will be concidered as a single word
@@ -356,7 +357,7 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 				stop = -1
 			;
 		;
-		if verbose: echo imports
+		echo '\tImports Found: ', imports
 
 		# split each import line by `,`, while dealing with [...]
 		var modules: seq[string]
@@ -377,7 +378,7 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 				;
 			;
 		;
-		echo modules
+		echo '\tModules Found: ', modules
 
 		# resolve the module paths
 		var conf = newConfigRef()
@@ -388,7 +389,7 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 			if full_path != '' and full_path notin processed:
 				echo '######## Converting: ', full_path,' (output: ', output, ') ########'
 				processed.add full_path
-				main full_path, verbose, output
+				discard main(full_path, verbose, output)
 			;
 			# if is a nim file and output is specified, copy to output
 			elif output != '':
@@ -396,12 +397,17 @@ proc stuff(tokens: var seq[Token], verbose=false, file: string, output: string) 
 				if full_path != '' and full_path notin processed:
 					echo 'Copying: ', full_path, ' to ', output / module.add_file_ext 'nim'
 					processed.add full_path
+
+					create_dir (output / module).parent_dir()
 					copy_file full_path, output / module.add_file_ext 'nim'
+
+					echo 'Going throught: ', module
+					var tmp = full_path.readFile().ssplit().tokenize()
+					tmp.handle_imports()
 				;
 			;
 		;
 	;
-
 	#proc allow_comments()
 
 	tokens.handle_imports()
@@ -446,39 +452,48 @@ proc more_stuff(code: string, verbose=false): string =
 	return new_code
 ;
 
-proc main(file2: string, verbose=false, output = '') =
-	var file = file2
-	var output_folder: string
+# helper functions
+proc resolve_input(input: var string) =
+	# allow user to omit file extension
+	if input.split_file.ext == '' and not input.file_exists:
+		input = input.add_file_ext 'zxv'
+	;
+;
+proc resolve_input(input: string): string =
+	var file = input
+	file.resolve_input()
+	return file
+;
+proc resolve_output(input: string, output: string): (string, string) =
+	var out_folder: string
 	var out_file: string
-	# process paths
-	# # get output folder and file
-	# ## if output not specified, save to ... .nim
+	# if output not specified, save to ... .nim
 	if output == '':
-		output_folder = file.parent_dir()
-		out_file = file.extract_filename().change_file_ext '.nim'
+		out_folder = input.parent_dir()
+		out_file = input.extract_filename().change_file_ext '.nim'
 	;
-	# ## if its a folder, (if not exist and not ends with /, assume its file)
+	# if its a folder, (if not exist and not ends with /, assume its file)
 	elif output.dir_exists or (not output.file_exists and output.endsWith('/')):
-		output_folder = output
-		out_file = file.extract_filename().change_file_ext '.nim'
-		createDir output_folder
+		out_folder = output
+		out_file = input.extract_filename().change_file_ext '.nim'
+		create_dir out_folder
 	;
-	# ## else, output is a file
+	# else, output is a file
 	else:
-		output_folder = output.parent_dir()
+		out_folder = output.parent_dir()
 		out_file = output.extract_filename()
-		createDir output_folder
+		create_dir out_folder
 	;
-	# # allow user to omit file extension
-	if file.split_file.ext == '' and not file.file_exists:
-		file = file.add_file_ext 'zxv'
-		out_file = out_file.add_file_ext 'nim'
+	# add / when appropriate
+	if not out_folder.ends_with '/':
+		out_folder.add '/'
 	;
-	# # add / when appropriate
-	if not output_folder.ends_with '/':
-		output_folder.add '/'
-	;
+;
 
+# main
+proc main(file2: string, verbose=false, output = ''): string =
+	let file = file2.resolve_input()
+	let (out_folder, out_file) = file.resolve_output output
 	# load code
 	var code = readFile file
 
@@ -489,26 +504,37 @@ proc main(file2: string, verbose=false, output = '') =
 		scode.add '\n'
 	;
 
-	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose, file, output_folder).untokenize(verbose).more_stuff(verbose)
+	code = scode.tokenize(verbose).indent(verbose).transform_string(verbose).stuff(verbose, file, out_folder).untokenize(verbose).more_stuff(verbose)
 
 	# save code, TODO: if output exists and is folder, save to inside folder, if output exists and is file, warn maybe
-	echo 'Saving ', file, ' to ', output_folder / out_file
-	writeFile output_folder / out_file, code
+	echo 'Saving ', file, ' to ', out_folder / out_file
+	writeFile out_folder / out_file, code
+	return out_folder / out_file
 ;
 
 
 proc format*(input: string, output = '', verbose=false) =
 	echo 'format, ' & input & ', ' & output & ', ' & $verbose
 ;
-proc compile*(input: string, output = '', tmp_folder='', verbose=false) =
-	echo 'compile, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
+
+
+
 ;
 proc run*(input: string, output = '', tmp_folder='', verbose=false) =
 	echo 'run, ' & input & ', ' & output & ', ' & tmp_folder & ', ' & $verbose
 ;
-proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false) =
+proc convert*(input: string, output = '', format='nim', tmp_folder='', verbose=false): string =
 	echo 'Converting: ', input
-	main input, verbose, output
+	return main(input, verbose, output)
+;
+proc compile*(input: string, output = '', tmp_folder='', verbose=false) =
+	let tmp_dir = 'zxv'.create_temp_dir ''
+	echo 'Compiling nim files to ' + tmp_dir
+	let (out_folder, out_file) = input.resolve_output output
+
+	let converted_file = input.convert(tmp_dir, 'nim', tmp_folder, verbose)
+
+	discard exec_cmd 'nim c -o ' + out_folder.quote_shell()  + ' ' + converted_file.quote_shell()
 ;
 
 
@@ -520,8 +546,11 @@ when isMainModule:
 # ToDo:
 	# - for import, add support for copying nim files that are imported by other nim files to output
 	# - for import, support string imports
+		# - should change 'path/to/file.zxv' to 'path/to/file.nim'
 	# - implement compile and run
 	# - auto convert ## to # or : : (documentation comments)
 	# - add support for fmt (code inside strings)
 		# - make sure that r'string' works
 	# - maybe add support for #:
+	# - add support for unpacking without brackets
+		# - eg: let a, b = ... instead of let (a, b) = ...
